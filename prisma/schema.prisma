@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  type        String   @default("single")
+  categoryId  String
+  productName String?
+  imageA      String?
+  imageB      String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Product {
+  id               String   @id @default(uuid())
+  name             String
+  productGroupId   String?
+  status           String   @default("active")
+  stockStatus      String   @default("in_stock")
+  quantity         Int?     @default(0)
+  currentPrice     Float    @default(0)
+  originalPrice    Float?   @default(0)
+  priceUnit        String   @default("per-piece")
+  mainCategory     String?
+  category         String?
+  subcategory      String?
+  brand            String?
+  hsnCode          String?
+  gstRate          String?
+  badge            String?
+  estimatedDelivery String?
+  freeShipping     Boolean  @default(false)
+  description      String?  @db.Text
+  primaryImageUrl  String?
+  imageUrl         String?
+  thumbnailUrls    String[] @default([])
+  colorVariant     String?
+  materials        String[] @default([])
+  services         String[] @default([])
+  features         String[] @default([])
+  specifications   Json?
+  warranty         String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
