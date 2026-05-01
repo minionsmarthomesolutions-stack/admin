@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Management | Minion Smart Home Solutions</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #FFD700;
+            --primary-dark: #E6C200;
+            --success-color: #10B981;
+            --danger-color: #EF4444;
+            --info-color: #3B82F6;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --border-color: #e0e0e0;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-secondary); color: var(--text-primary); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        .header { background: var(--bg-primary); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow-sm); }
+        .header-content { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+        .logo-text { font-size: 28px; font-weight: 800; color: var(--text-primary); text-decoration: none; }
+        .smart-home-badge { background: var(--primary-color); padding: 4px 8px; border-radius: 6px; margin-left: 10px; }
+        .badge-text { font-size: 10px; font-weight: 700; }
+        .btn-primary { background: var(--primary-color); color: #1a1a1a; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-secondary { background: transparent; color: var(--text-primary); border: 2px solid var(--primary-color); padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; text-decoration: none; }
+
+        .page-header { margin: 26px 0; text-align: center; }
+        .page-header h1 { font-size: 30px; font-weight: 800; margin-bottom: 6px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 18px 0 26px; }
+        .stat { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; text-align: center; box-shadow: var(--shadow-sm); }
+        .stat .num { font-size: 22px; font-weight: 800; color: #be8a00; }
+        .list-header { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 18px; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+        .card { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; }
+        .thumb { width: 100%; height: 160px; background: #ffffff; object-fit: contain; }
+        .card-body { padding: 14px; display: grid; gap: 8px; }
+        .title { font-weight: 700; font-size: 16px; }
+        .meta { font-size: 12px; color: var(--text-secondary); }
+        .actions { display: flex; gap: 8px; margin-top: 8px; }
+        .actions .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: #fff; cursor: pointer; font-weight: 600; font-size: 13px; }
+        .btn-edit { color: #1f2937; }
+        .btn-dup { color: #0b6ef3; }
+        .btn-del { color: #b91c1c; }
+        .btn-publish { color: #059669; }
+        .empty { text-align: center; color: var(--text-secondary); padding: 40px 0; }
+        .toolbar { display: flex; gap: 10px; align-items: center; }
+        .search { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color); min-width: 240px; }
+        .actions .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: #fff; cursor: pointer; font-weight: 600; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <a href="index.html" class="logo-text">CRM</a>
+                    <div class="smart-home-badge"><span class="badge-text">SERVICE</span></div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <a href="add-service.html" class="btn-primary"><i class="fa fa-plus"></i> Add New Service</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="page-header">
+                <h1>Service Management</h1>
+                <p>Review, edit, duplicate, or delete services from your catalog.</p>
+            </div>
+
+            <div class="stats">
+                <div class="stat"><div class="num" id="total-count">0</div><div>Total Services</div></div>
+            </div>
+
+            <div class="list-header">
+                <div class="toolbar">
+                    <input id="search" class="search" type="text" placeholder="Search by name or tag...">
+                    <button onclick="debugServices()" class="btn-secondary" style="padding: 8px 12px; font-size: 12px;">
+                        <i class="fa fa-bug"></i> Debug
+                    </button>
+                </div>
+                <div style="color:var(--text-secondary);font-size:13px;" id="last-updated"></div>
+            </div>
+
+            <div id="grid" class="grid"></div>
+            <div id="empty" class="empty" style="display:none;">No services found.</div>
+        </div>
+    </main>
+
+    <!-- Firebase configuration (must define window.db, window.storage) -->
+    <script src="../firebase-config.js"></script>
+    
+    <!-- Fallback Firebase initialization -->
+    <script>
+        // Fallback initialization if firebase-config.js fails
+        setTimeout(() => {
+            if (!window._firebaseInitialized && window.firebase) {
+                console.log('Firebase config failed, attempting fallback initialization...');
+                try {
+                    const firebaseConfig = {
+            apiKey: "AIzaSyD152fC4d75Tzb1pGiBfuTfyJwZ4zyO_34",
+            authDomain: "deczon-faa54.firebaseapp.com",
+            projectId: "deczon-faa54",
+            storageBucket: "deczon-faa54.firebasestorage.app",
+            messagingSenderId: "816426698816",
+            appId: "1:816426698816:web:3d6d6268f69db01e0037a5",
+            measurementId: "G-7D1WDN68TX"
+        };
+                    
+                    window.firebase.initializeApp(firebaseConfig);
+                    window.db = window.firebase.firestore();
+                    window.auth = window.firebase.auth();
+                    window.storage = window.firebase.storage();
+                    window._firebaseInitialized = true;
+                    console.log("Firebase fallback initialization successful");
+                } catch (e) {
+                    console.error("Firebase fallback initialization failed:", e);
+                }
+            }
+        }, 1000);
+    </script>
+
+    <script>
+        const gridEl = document.getElementById('grid');
+        const emptyEl = document.getElementById('empty');
+        const totalEl = document.getElementById('total-count');
+        const searchEl = document.getElementById('search');
+        const lastUpdatedEl = document.getElementById('last-updated');
+
+        let allServices = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('Starting application initialization...');
+                await waitForFirebase();
+                console.log('Firebase initialized, loading services...');
+                await loadServices();
+                console.log('Services loaded, setting up event listeners...');
+                
+                searchEl.addEventListener('input', render);
+                
+                // Add a test button to create a sample service if none exist
+                if (allServices.length === 0) {
+                    console.log('No services found, showing test buttons');
+                    addTestServiceButton();
+                }
+                
+                console.log('Application initialization complete');
+            } catch (error) {
+                console.error('Application initialization failed:', error);
+                console.error('Error details:', error.message, error.stack);
+                
+                // Show error message and test buttons
+                const emptyEl = document.getElementById('empty');
+                if (emptyEl) {
+                    emptyEl.innerHTML = `
+                        <div style="text-align: center; padding: 40px 0;">
+                            <h3 style="color: #ef4444;">Application Error</h3>
+                            <p style="color: #666; margin: 10px 0;">Failed to initialize: ${error.message}</p>
+                            <p style="color: #666; margin: 10px 0;">Check the browser console for more details.</p>
+                            <button onclick="debugServices()" class="btn-primary" style="margin: 10px;">
+                                <i class="fa fa-bug"></i> Debug Info
+                            </button>
+                            <button onclick="createTestService()" class="btn-secondary" style="margin: 10px;">
+                                <i class="fa fa-plus"></i> Create Test Service
+                            </button>
+                        </div>
+                    `;
+                    emptyEl.style.display = 'block';
+                }
+            }
+        });
+
+        function waitForFirebase() {
+            return new Promise((resolve, reject) => {
+                console.log('Waiting for Firebase initialization...');
+                console.log('Current window.db:', window.db);
+                console.log('Current window.storage:', window.storage);
+                console.log('Current firebase object:', typeof firebase);
+                
+                if (window.db && window.storage) { 
+                    console.log('Firebase already initialized');
+                    resolve(); 
+                    return; 
+                }
+                
+                let attempts = 0;
+                const maxAttempts = 50; // 5 seconds max wait
+                
+                const i = setInterval(() => { 
+                    attempts++;
+                    console.log(`Firebase init attempt ${attempts}/${maxAttempts}`);
+                    console.log('window.db:', !!window.db);
+                    console.log('window.storage:', !!window.storage);
+                    
+                    if (window.db && window.storage) { 
+                        console.log('Firebase initialized successfully');
+                        clearInterval(i); 
+                        resolve(); 
+                    } else if (attempts >= maxAttempts) {
+                        console.error('Firebase initialization timeout');
+                        clearInterval(i);
+                        reject(new Error('Firebase initialization timeout'));
+                    }
+                }, 100);
+            });
+        }
+
+        async function loadServices() {
+            try {
+                console.log('Loading services from Firebase...');
+                console.log('Firebase db object:', window.db);
+                console.log('Firebase app:', firebase.app());
+                
+                if (!window.db) {
+                    throw new Error('Firebase database not initialized');
+                }
+                
+                // Try to load services without ordering first (in case createdAt field doesn't exist)
+                let snap;
+                try {
+                    snap = await window.db.collection('services').orderBy('createdAt', 'desc').get();
+                } catch (orderError) {
+                    console.log('OrderBy failed, trying without ordering:', orderError);
+                    snap = await window.db.collection('services').get();
+                }
+                
+                console.log('Firebase query result:', snap);
+                console.log('Number of documents:', snap.docs.length);
+                
+                allServices = snap.docs.map(d => {
+                    const data = d.data();
+                    console.log('Service data:', data);
+                    return { id: d.id, ...data };
+                }).filter(service => service.status !== 'draft'); // Filter out draft services
+                
+                console.log('All services loaded:', allServices);
+                totalEl.textContent = allServices.length;
+                render();
+                lastUpdatedEl.textContent = `Updated ${new Date().toLocaleString()}`;
+            } catch (err) {
+                console.error('Failed to load services', err);
+                console.error('Error details:', err.message, err.code);
+                gridEl.innerHTML = '';
+                emptyEl.style.display = 'block';
+                emptyEl.textContent = `Failed to load services: ${err.message}`;
+                
+                // Show debug info
+                addTestServiceButton();
+            }
+        }
+
+        function render() {
+            console.log('Rendering services, total:', allServices.length);
+            const q = (searchEl.value || '').toLowerCase().trim();
+            
+            let list = allServices;
+            
+            // Apply search filter
+            if (q) {
+                list = list.filter(s => (s.name||'').toLowerCase().includes(q) || (s.seoTags||[]).join(',').toLowerCase().includes(q));
+            }
+            
+
+            console.log('Filtered list length:', list.length);
+            gridEl.innerHTML = '';
+            if (list.length === 0) {
+                console.log('No services to display, showing empty message');
+                emptyEl.style.display = 'block';
+                return;
+            }
+            emptyEl.style.display = 'none';
+
+            list.forEach(svc => {
+                console.log('Creating card for service:', svc.name);
+                console.log('Service gallery images:', svc.galleryImages);
+                console.log('Service packages:', svc.packages);
+                
+                // choose best available image among gallery and package galleries
+                let mainImg = '';
+                const g = svc.galleryImages || {};
+                
+                // Try service gallery images first (check all possible properties)
+                if (typeof g.main === 'string' && g.main && g.main.trim()) {
+                    mainImg = g.main;
+                    console.log('Using service gallery main image:', mainImg);
+                } else if (typeof g.medium === 'string' && g.medium && g.medium.trim()) {
+                    mainImg = g.medium;
+                    console.log('Using service gallery medium image:', mainImg);
+                } else if (typeof g.firstChild === 'string' && g.firstChild && g.firstChild.trim()) {
+                    mainImg = g.firstChild;
+                    console.log('Using service gallery firstChild image:', mainImg);
+                } else if (typeof g.lastChild === 'string' && g.lastChild && g.lastChild.trim()) {
+                    mainImg = g.lastChild;
+                    console.log('Using service gallery lastChild image:', mainImg);
+                } else if (typeof g.floating === 'string' && g.floating && g.floating.trim()) {
+                    mainImg = g.floating;
+                    console.log('Using service gallery floating image:', mainImg);
+                } else if (Array.isArray(g.orderedImages) && g.orderedImages.length > 0) {
+                    mainImg = g.orderedImages[0];
+                    console.log('Using service gallery ordered image:', mainImg);
+                } else {
+                    // Try package gallery images
+                    const packs = svc.packages || {};
+                    const packageTypes = ['basic', 'premium', 'elite'];
+                    
+                    for (const packageType of packageTypes) {
+                        const pack = packs[packageType];
+                        if (pack && pack.galleryImages) {
+                            const packGallery = pack.galleryImages;
+                            if (typeof packGallery.main === 'string' && packGallery.main && packGallery.main.trim()) {
+                                mainImg = packGallery.main;
+                                console.log(`Using ${packageType} package main image:`, mainImg);
+                                break;
+                            } else if (typeof packGallery.medium === 'string' && packGallery.medium && packGallery.medium.trim()) {
+                                mainImg = packGallery.medium;
+                                console.log(`Using ${packageType} package medium image:`, mainImg);
+                                break;
+                            } else if (Array.isArray(packGallery) && packGallery.length > 0) {
+                                mainImg = packGallery[0];
+                                console.log(`Using ${packageType} package gallery image:`, mainImg);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                const cat = [svc.mainCategory, svc.category, svc.subcategory].filter(Boolean).join(' › ');
+                const price = formatAnyPrice(svc.packages);
+                console.log('Service details:', { name: svc.name, category: cat, price, mainImg });
+                
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                
+                const fallbackImage = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'200\'%3E%3Crect width=\'400\' height=\'200\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%239ca3af\' font-family=\'Inter,Arial\' font-size=\'16\'%3ENo Image%3C/text%3E%3C/svg%3E';
+                
+                card.innerHTML = `
+                    <img class="thumb" src="${mainImg || fallbackImage}" alt="thumb" 
+                         onerror="console.warn('Failed to load image:', this.src); this.src='${fallbackImage}';"
+                         onload="console.log('Successfully loaded image:', this.src);">
+                    <div class="card-body">
+                        <div class="title">${escapeHtml(svc.name || 'Untitled Service')}</div>
+                        <div class="meta">${cat || 'Uncategorized'}${price ? ' · ' + price : ''}</div>
+                        <div class="actions">
+                            <button class="btn btn-edit" onclick="editService('${svc.id}')" title="Edit Service">
+                                <i class="fa fa-pencil"></i> Edit
+                            </button>
+                            <button class="btn btn-dup" onclick="duplicateService('${svc.id}')" title="Duplicate Service">
+                                <i class="fa fa-copy"></i> Duplicate
+                            </button>
+                            <button class="btn btn-del" onclick="deleteService('${svc.id}')" title="Delete Service">
+                                <i class="fa fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+                gridEl.appendChild(card);
+                console.log('Card appended to grid');
+            });
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"]+/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+        }
+
+        function formatAnyPrice(packs) {
+            if (!packs) return '';
+            const keys = ['basic','premium','elite'];
+            for (let k of keys) {
+                if (packs[k] && typeof packs[k].price === 'number' && !isNaN(packs[k].price)) {
+                    return `₹${packs[k].price}`;
+                }
+            }
+            return '';
+        }
+
+        
+
+
+
+
+
+        function addTestServiceButton() {
+            const emptyEl = document.getElementById('empty');
+            emptyEl.innerHTML = `
+                <div style="text-align: center; padding: 40px 0;">
+                    <h3>No services found</h3>
+                    <p>Create your first service or add a test service to get started.</p>
+                    <button onclick="createTestService()" class="btn-primary" style="margin: 10px;">
+                        <i class="fa fa-plus"></i> Create Test Service
+                    </button>
+                    <a href="add-service.html" class="btn-secondary" style="margin: 10px;">
+                        <i class="fa fa-plus"></i> Add New Service
+                    </a>
+                </div>
+            `;
+            emptyEl.style.display = 'block';
+        }
+
+        async function createTestService() {
+            try {
+                const testService = {
+                    name: "Smart Home Installation",
+                    description: "<p>Complete smart home installation service including lighting, security, and climate control systems.</p>",
+                    mainCategory: "Smart Home",
+                    category: "Installation",
+                    subcategory: "Complete Setup",
+                    galleryImages: {
+                        main: "https://via.placeholder.com/400x200/FFD700/000000?text=Smart+Home",
+                        medium: "https://via.placeholder.com/300x150/10B981/FFFFFF?text=Installation",
+                        firstChild: "https://via.placeholder.com/200x100/3B82F6/FFFFFF?text=Lighting",
+                        lastChild: "https://via.placeholder.com/200x100/EF4444/FFFFFF?text=Security",
+                        floating: "https://via.placeholder.com/150x75/8B5CF6/FFFFFF?text=Climate"
+                    },
+                    packages: {
+                        basic: {
+                            price: 1999,
+                            priceInfo: "Starting from ₹1999",
+                            galleryImages: {
+                                main: "https://via.placeholder.com/400x200/FFD700/000000?text=Basic+Package",
+                                medium: "https://via.placeholder.com/300x150/10B981/FFFFFF?text=Basic+Features",
+                                firstChild: "https://via.placeholder.com/200x100/3B82F6/FFFFFF?text=Basic+Lighting",
+                                lastChild: "https://via.placeholder.com/200x100/EF4444/FFFFFF?text=Basic+Security",
+                                floating: "https://via.placeholder.com/150x75/8B5CF6/FFFFFF?text=Basic+Climate"
+                            },
+                            includedFeatures: [
+                                { text: "Smart Bulbs Installation", description: "Installation of 5 smart LED bulbs", imageUrl: null },
+                                { text: "Basic Security Setup", description: "Installation of door sensors", imageUrl: null }
+                            ],
+                            excludedFeatures: [
+                                { text: "Advanced Automation", description: "Complex automation rules not included", imageUrl: null }
+                            ]
+                        },
+                        premium: {
+                            price: 2999,
+                            priceInfo: "Starting from ₹2999",
+                            galleryImages: {
+                                main: "https://via.placeholder.com/400x200/10B981/FFFFFF?text=Premium+Package",
+                                medium: "https://via.placeholder.com/300x150/3B82F6/FFFFFF?text=Premium+Features",
+                                firstChild: "https://via.placeholder.com/200x100/EF4444/FFFFFF?text=Premium+Lighting",
+                                lastChild: "https://via.placeholder.com/200x100/8B5CF6/FFFFFF?text=Premium+Security",
+                                floating: "https://via.placeholder.com/150x75/FFD700/000000?text=Premium+Climate"
+                            },
+                            includedFeatures: [
+                                { text: "Complete Smart Lighting", description: "Full home smart lighting system", imageUrl: null },
+                                { text: "Advanced Security", description: "CCTV cameras and smart locks", imageUrl: null },
+                                { text: "Climate Control", description: "Smart thermostat installation", imageUrl: null }
+                            ],
+                            excludedFeatures: [
+                                { text: "Custom Programming", description: "Advanced automation programming not included", imageUrl: null }
+                            ]
+                        },
+                        elite: {
+                            price: 4999,
+                            priceInfo: "Starting from ₹4999",
+                            galleryImages: {
+                                main: "https://via.placeholder.com/400x200/8B5CF6/FFFFFF?text=Elite+Package",
+                                medium: "https://via.placeholder.com/300x150/EF4444/FFFFFF?text=Elite+Features",
+                                firstChild: "https://via.placeholder.com/200x100/FFD700/000000?text=Elite+Lighting",
+                                lastChild: "https://via.placeholder.com/200x100/10B981/FFFFFF?text=Elite+Security",
+                                floating: "https://via.placeholder.com/150x75/3B82F6/FFFFFF?text=Elite+Climate"
+                            },
+                            includedFeatures: [
+                                { text: "Complete Smart Home", description: "Full smart home automation", imageUrl: null },
+                                { text: "Custom Programming", description: "Personalized automation rules", imageUrl: null },
+                                { text: "Premium Support", description: "24/7 technical support", imageUrl: null }
+                            ],
+                            excludedFeatures: []
+                        }
+                    },
+                    seoTags: ["smart home", "installation", "automation", "lighting", "security"],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                const docRef = await window.db.collection('services').add(testService);
+                console.log('Test service created with ID:', docRef.id);
+                await loadServices();
+                alert('Test service created successfully!');
+            } catch (e) {
+                console.error('Failed to create test service:', e);
+                alert('Failed to create test service: ' + e.message);
+            }
+        }
+
+
+        // Edit service function
+        function editService(serviceId) {
+            console.log('Editing service:', serviceId);
+            window.location.href = `add-service.html?id=${serviceId}`;
+        }
+
+        // Duplicate service function
+        async function duplicateService(serviceId) {
+            try {
+                if (!window.db) {
+                    alert('Database not available');
+                    return;
+                }
+
+                const confirmDuplicate = confirm('Are you sure you want to duplicate this service?');
+                if (!confirmDuplicate) return;
+
+                const serviceDoc = await window.db.collection('services').doc(serviceId).get();
+                if (!serviceDoc.exists) {
+                    alert('Service not found');
+                    return;
+                }
+
+                const serviceData = serviceDoc.data();
+                
+                // Create a copy with modified name and timestamps
+                const duplicatedData = {
+                    ...serviceData,
+                    name: `${serviceData.name} (Copy)`,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'draft' // Set as draft for review
+                };
+
+                // Remove the original ID
+                delete duplicatedData.id;
+
+                const newDocRef = await window.db.collection('services').add(duplicatedData);
+                console.log('Service duplicated with ID:', newDocRef.id);
+                
+                // Reload services to show the new duplicate
+                await loadServices();
+                alert('Service duplicated successfully!');
+            } catch (error) {
+                console.error('Error duplicating service:', error);
+                alert('Failed to duplicate service: ' + error.message);
+            }
+        }
+
+        // Delete service function
+        async function deleteService(serviceId) {
+            try {
+                if (!window.db) {
+                    alert('Database not available');
+                    return;
+                }
+
+                const confirmDelete = confirm('Are you sure you want to delete this service? This action cannot be undone.');
+                if (!confirmDelete) return;
+
+                await window.db.collection('services').doc(serviceId).delete();
+                console.log('Service deleted:', serviceId);
+                
+                // Reload services to reflect the deletion
+                await loadServices();
+                alert('Service deleted successfully!');
+            } catch (error) {
+                console.error('Error deleting service:', error);
+                alert('Failed to delete service: ' + error.message);
+            }
+        }
+
+        // Debug function to help identify issues
+        async function debugServices() {
+            try {
+                console.log('=== DEBUG SERVICES ===');
+                console.log('Firebase db available:', !!window.db);
+                console.log('Firebase storage available:', !!window.storage);
+                console.log('Firebase app available:', !!firebase.app);
+                console.log('All services array:', allServices);
+                console.log('All services length:', allServices.length);
+                
+                if (window.db) {
+                    console.log('Testing Firebase connection...');
+                    try {
+                        const testQuery = await window.db.collection('services').limit(5).get();
+                        console.log('Firebase query successful, docs:', testQuery.docs.length);
+                        console.log('Sample documents:', testQuery.docs.map(d => ({ id: d.id, data: d.data() })));
+                        
+                        // Test creating a simple document
+                        console.log('Testing document creation...');
+                        const testDoc = await window.db.collection('test').add({
+                            message: 'Test document',
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log('Test document created with ID:', testDoc.id);
+                        
+                        // Clean up test document
+                        await testDoc.delete();
+                        console.log('Test document deleted');
+                        
+                    } catch (queryError) {
+                        console.error('Firebase query failed:', queryError);
+                        console.error('Error code:', queryError.code);
+                        console.error('Error message:', queryError.message);
+                    }
+                } else {
+                    console.error('Firebase db not available');
+                    console.log('Checking firebase-config.js loading...');
+                    console.log('Script tags:', document.querySelectorAll('script[src*="firebase"]'));
+                }
+                
+                alert(`Debug info logged to console. Services: ${allServices.length}, Firebase: ${!!window.db}`);
+            } catch (e) {
+                console.error('Debug error:', e);
+                alert('Debug error: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
+
