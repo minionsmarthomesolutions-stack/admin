@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Camera, 
   Home, 
@@ -327,15 +327,24 @@ const PackageSection = ({
 
 
 export default function AddServicePage() {
-  const availableCategories = ["Automation", "Ceiling", "Tech", "Flooring", "Lighting", "Cooling"];
-
+  const [categoriesData, setCategoriesData] = useState<any[]>([]);
+  const [openCats, setOpenCats] = useState<string[]>([]);
+  
   // Dynamic State
   const [serviceName, setServiceName] = useState("");
   const [serviceCode] = useState("SE45"); // Auto-generated mockup
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedMain, setSelectedMain] = useState("");
+  const [selectedCat, setSelectedCat] = useState("");
+  const [selectedSub, setSelectedSub] = useState("");
   const [content, setContent] = useState("");
   const [seoTags, setSeoTags] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/categories').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setCategoriesData(data);
+    }).catch(console.error);
+  }, []);
 
   const [packages, setPackages] = useState({
     basic: defaultPackage(),
@@ -347,10 +356,8 @@ export default function AddServicePage() {
     setPackages(prev => ({ ...prev, [pkgKey]: data }));
   };
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
-    );
+  const toggleCat = (name: string) => {
+    setOpenCats(p => p.includes(name) ? p.filter(x => x !== name) : [...p, name]);
   };
 
   const handleSave = async (status: 'draft' | 'active') => {
@@ -366,9 +373,9 @@ export default function AddServicePage() {
         name: serviceName,
         serviceCode: serviceCode || `SRV-${Math.floor(1000 + Math.random() * 9000)}`,
         description: content,
-        mainCategory: selectedCategories[0] || '',
-        category: selectedCategories[1] || '',
-        subcategory: selectedCategories[2] || '',
+        mainCategory: selectedMain || '',
+        category: selectedCat || '',
+        subcategory: selectedSub || '',
         galleryImages: [], 
         packages: packages,
         seoTags: seoTags ? seoTags.split(',').map(tag => tag.trim()) : [],
@@ -415,34 +422,68 @@ export default function AddServicePage() {
       {/* Category Selection */}
       <div className="mb-8">
         <label className="block text-sm font-bold text-gray-800 mb-2">Category Selection *</label>
-        <div className="border border-gray-200 rounded-lg p-2 flex">
-          <div className="flex-1 flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-            {availableCategories.map((cat, i) => {
-              const isSelected = selectedCategories.includes(cat);
-              return (
-                <div 
-                  key={i} 
-                  onClick={() => toggleCategory(cat)}
-                  className={`${isSelected ? 'bg-[#ebd500]' : 'bg-gray-100 hover:bg-gray-200'} cursor-pointer transition rounded-md p-3 flex items-center gap-3`}
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+          {categoriesData.length === 0 ? <div className="text-sm text-gray-500">Loading categories...</div> : categoriesData.map((catObj) => {
+            const main = catObj.id;
+            const subcategoriesObj = catObj.document?.subcategories || {};
+            const subs = Object.keys(subcategoriesObj);
+            
+            return (
+              <div key={main} className="border border-gray-200 rounded-lg overflow-hidden">
+                <div
+                  onClick={() => toggleCat(main)}
+                  className={`p-3 flex items-center gap-3 cursor-pointer font-bold ${selectedMain === main ? 'bg-[#ffc800] text-gray-900' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                 >
-                  <ChevronRight size={16} className={isSelected ? "text-gray-900" : "text-gray-400"} />
+                  <ChevronRight size={16} className={`transition-transform ${openCats.includes(main) ? "rotate-90" : ""}`} />
                   <div className="bg-white p-1 rounded">
-                    <Home size={14} className={isSelected ? "text-gray-700" : "text-gray-400"} />
+                    <Home size={14} className={selectedMain === main ? "text-gray-700" : "text-gray-400"} />
                   </div>
-                  <span className={`font-bold flex-1 ${isSelected ? "text-gray-900" : "text-gray-500"}`}>{cat}</span>
-                  <span className={`${isSelected ? 'bg-yellow-500/20 text-yellow-700' : 'bg-gray-200 text-gray-500'} text-[10px] font-bold px-2 py-0.5 rounded transition`}>
-                    No Code
-                  </span>
+                  <span className="flex-1">{main}</span>
                 </div>
-              );
-            })}
-          </div>
-          <div className="w-4 bg-gray-100 rounded-full flex flex-col justify-between items-center py-1 ml-2">
-            <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-gray-400"></div>
-            <div className="w-2.5 h-32 bg-gray-400 rounded-full"></div>
-            <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-gray-400"></div>
-          </div>
+                {openCats.includes(main) && (
+                  <div className="p-3 bg-gray-50 flex flex-col gap-3 border-t border-gray-200">
+                    <div className="flex flex-wrap gap-2">
+                      {subs.map(sub => (
+                        <button
+                          key={sub} type="button"
+                          onClick={() => { setSelectedMain(main); setSelectedCat(sub); setSelectedSub(""); }}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium border ${selectedCat === sub && selectedMain === main ? 'border-yellow-400 bg-yellow-50 text-yellow-800' : 'border-gray-200 bg-white text-gray-600'}`}
+                        >{sub}</button>
+                      ))}
+                    </div>
+                    {selectedMain === main && selectedCat && subcategoriesObj[selectedCat]?.items && (
+                      <div className="mt-2 p-3 bg-white border border-gray-200 rounded-md">
+                        <label className="block text-xs font-bold text-gray-500 mb-2">Select Item / Subcategory:</label>
+                        <div className="flex flex-wrap gap-2">
+                          {subcategoriesObj[selectedCat].items.map((item: string) => (
+                            <button
+                              key={item} type="button"
+                              onClick={() => setSelectedSub(item)}
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium border ${selectedSub === item ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}
+                            >{item}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <input
+                        type="text" placeholder="Other (type custom subcategory)"
+                        value={selectedMain === main ? selectedSub : ""}
+                        onChange={e => { setSelectedMain(main); setSelectedSub(e.target.value); }}
+                        className="border border-gray-300 rounded px-3 py-1.5 text-sm w-64 outline-none focus:border-yellow-400"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+        {selectedMain && (
+          <p className="mt-3 text-sm text-green-600 font-medium">
+            ✓ Selected: <strong>{selectedMain}</strong> {selectedCat && `› ${selectedCat}`} {selectedSub ? `› ${selectedSub}` : ""}
+          </p>
+        )}
       </div>
 
       {/* Content Editor Toolbar */}

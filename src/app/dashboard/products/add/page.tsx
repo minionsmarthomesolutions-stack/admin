@@ -31,12 +31,7 @@ interface MaterialVariant {
 }
 
 /* ───────────────────── category data ───────────────────────── */
-const CATEGORY_DATA: Record<string, string[]> = {
-  "Smart Home":   ["Switches", "Sensors", "Automation", "Lighting", "Security"],
-  "Electronics":  ["Bulbs", "Fans", "Appliances", "Inverters"],
-  "Furniture":    ["Sofas", "Beds", "Tables", "Chairs"],
-  "Outdoor":      ["Garden", "Decor", "Tools"],
-};
+// Fetched dynamically now
 
 /* ─────────────────────── RichTextEditor ─────────────────────── */
 function RichTextEditor({ placeholder }: { placeholder?: string }) {
@@ -122,10 +117,17 @@ export default function AddProductPage() {
   const router = useRouter();
 
   /* category state */
+  const [categoriesData, setCategoriesData] = useState<any[]>([]);
   const [openCats, setOpenCats]     = useState<string[]>([]);
   const [selectedMain, setSelectedMain] = useState("");
   const [selectedCat, setSelectedCat]   = useState("");
   const [selectedSub, setSelectedSub]   = useState("");
+
+  useEffect(() => {
+    fetch('/api/categories').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setCategoriesData(data);
+    }).catch(console.error);
+  }, []);
 
   /* global basics */
   const [productName, setProductName]   = useState("");
@@ -309,51 +311,84 @@ export default function AddProductPage() {
         <div style={fgStyle}>
           <label style={labelStyle}>Category Selection *</label>
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-            {Object.entries(CATEGORY_DATA).map(([main, subs]) => (
-              <div key={main} style={{ border: "1px solid #e5e7eb", borderRadius: 4, overflow: "hidden" }}>
-                {/* accordion header */}
-                <div
-                  onClick={() => toggleCat(main)}
-                  style={{
-                    background: selectedMain === main ? "#555" : "#666",
-                    color: "#fff", padding: "10px 16px", display: "flex",
-                    alignItems: "center", gap: 10, cursor: "pointer",
-                    fontWeight: 600, fontSize: 13,
-                  }}
-                >
-                  <span style={{ fontSize: 10, transition: "transform .2s", transform: openCats.includes(main) ? "rotate(90deg)" : "none" }}>▶</span>
-                  {main}
-                </div>
-                {/* subs */}
-                {openCats.includes(main) && (
-                  <div style={{ padding: "10px 16px", background: "#f9fafb", display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {subs.map(sub => (
-                      <button
-                        key={sub} type="button"
-                        onClick={() => { setSelectedMain(main); setSelectedCat(sub); setSelectedSub(""); }}
-                        style={{
-                          padding: "4px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer",
-                          border: selectedCat === sub && selectedMain === main ? "2px solid #ffc000" : "1px solid #d1d5db",
-                          background: selectedCat === sub && selectedMain === main ? "#fff9e6" : "#fff",
-                          fontWeight: selectedCat === sub && selectedMain === main ? 700 : 400,
-                          color: selectedCat === sub && selectedMain === main ? "#b45309" : "#374151",
-                        }}
-                      >{sub}</button>
-                    ))}
-                    <input
-                      type="text" placeholder="Other (type subcategory)"
-                      value={selectedMain === main ? selectedSub : ""}
-                      onChange={e => { setSelectedMain(main); setSelectedSub(e.target.value); setSelectedCat(e.target.value); }}
-                      style={{ ...inputStyle, width: 180, padding: "4px 8px", fontSize: 12 }}
-                    />
+            {categoriesData.length === 0 ? <div style={{ fontSize: 13, color: '#666' }}>Loading categories...</div> : categoriesData.map((catObj) => {
+              const main = catObj.id;
+              const subcategoriesObj = catObj.document?.subcategories || {};
+              const subs = Object.keys(subcategoriesObj);
+              
+              return (
+                <div key={main} style={{ border: "1px solid #e5e7eb", borderRadius: 4, overflow: "hidden" }}>
+                  {/* accordion header */}
+                  <div
+                    onClick={() => toggleCat(main)}
+                    style={{
+                      background: selectedMain === main ? "#555" : "#666",
+                      color: "#fff", padding: "10px 16px", display: "flex",
+                      alignItems: "center", gap: 10, cursor: "pointer",
+                      fontWeight: 600, fontSize: 13,
+                    }}
+                  >
+                    <span style={{ fontSize: 10, transition: "transform .2s", transform: openCats.includes(main) ? "rotate(90deg)" : "none" }}>▶</span>
+                    {main}
                   </div>
-                )}
-              </div>
-            ))}
+                  {/* subs */}
+                  {openCats.includes(main) && (
+                    <div style={{ padding: "10px 16px", background: "#f9fafb", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {subs.map(sub => (
+                          <button
+                            key={sub} type="button"
+                            onClick={() => { setSelectedMain(main); setSelectedCat(sub); setSelectedSub(""); }}
+                            style={{
+                              padding: "4px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer",
+                              border: selectedCat === sub && selectedMain === main ? "2px solid #ffc000" : "1px solid #d1d5db",
+                              background: selectedCat === sub && selectedMain === main ? "#fff9e6" : "#fff",
+                              fontWeight: selectedCat === sub && selectedMain === main ? 700 : 400,
+                              color: selectedCat === sub && selectedMain === main ? "#b45309" : "#374151",
+                            }}
+                          >{sub}</button>
+                        ))}
+                      </div>
+                      
+                      {/* Third level items if a sub is selected */}
+                      {selectedMain === main && selectedCat && subcategoriesObj[selectedCat]?.items && (
+                        <div style={{ marginTop: 8, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 4 }}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 6, display: "block" }}>Select Item / Subcategory:</label>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {subcategoriesObj[selectedCat].items.map((item: string) => (
+                              <button
+                                key={item} type="button"
+                                onClick={() => setSelectedSub(item)}
+                                style={{
+                                  padding: "3px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer",
+                                  border: selectedSub === item ? "1px solid #10b981" : "1px solid #d1d5db",
+                                  background: selectedSub === item ? "#d1fae5" : "#f3f4f6",
+                                  fontWeight: selectedSub === item ? 600 : 400,
+                                  color: selectedSub === item ? "#047857" : "#4b5563",
+                                }}
+                              >{item}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div style={{ marginTop: 8 }}>
+                        <input
+                          type="text" placeholder="Other (type custom subcategory)"
+                          value={selectedMain === main ? selectedSub : ""}
+                          onChange={e => { setSelectedMain(main); setSelectedSub(e.target.value); }}
+                          style={{ ...inputStyle, width: 220, padding: "4px 8px", fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {selectedMain && (
             <p style={{ marginTop: 8, fontSize: 12, color: "#059669" }}>
-              ✓ Selected: <strong>{selectedMain}</strong> › <strong>{selectedCat}</strong>{selectedSub ? ` › ${selectedSub}` : ""}
+              ✓ Selected: <strong>{selectedMain}</strong> {selectedCat && `› ${selectedCat}`} {selectedSub ? `› ${selectedSub}` : ""}
             </p>
           )}
         </div>

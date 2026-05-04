@@ -1,0 +1,324 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Banner Module | Admin</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="banner-style.css">
+
+    <!-- Firebase SDKs (Compat for existing config compatibility) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">Admin Banner/Ads Manager</div>
+            <div class="header-actions">
+                <a href="../index.html" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+        </header>
+
+        <main class="main-layout">
+            <!-- Top Column: Live Preview -->
+            <section class="preview-column">
+                <div class="preview-sticky-wrapper">
+                    <div class="preview-header">
+                        <h2>Live Preview</h2>
+                        <div class="preview-controls">
+                            <button id="toggleMobilePreview" class="btn-icon" title="Toggle Mobile View">ðŸ“±</button>
+                            <button id="resetTransformBtn" class="btn-sm">Reset View</button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Stage -->
+                    <div id="previewStage" class="preview-stage">
+
+                        <!-- Banner A Preview -->
+                        <div id="previewContainerA" class="banner-preview-box active">
+                            <div class="empty-state">Banner A Preview</div>
+                            <img id="previewImgA" class="preview-image" draggable="false">
+                            <div class="overlay-controls">
+                                <div class="transform-info">Scale: <span id="scaleValA">1.0</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Banner B Preview -->
+                        <div id="previewContainerB" class="banner-preview-box hidden">
+                            <div class="empty-state">Banner B Preview</div>
+                            <img id="previewImgB" class="preview-image" draggable="false">
+                            <div class="overlay-controls">
+                                <div class="transform-info">Scale: <span id="scaleValB">1.0</span></div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Transform Controls -->
+                    <div class="transform-controls-panel">
+                        <div class="control-group">
+                            <label>Zoom / Scale <span id="activeSlotLabel">(Banner A)</span></label>
+                            <input type="range" id="zoomSlider" min="0.1" max="3" step="0.05" value="1">
+                        </div>
+                        <p class="help-text">ðŸ’¡ Drag image to move. Scroll to zoom.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bottom Column: Form Controls -->
+            <section class="form-column">
+                <form id="bannerForm" class="banner-form">
+
+                    <!-- 1. SEO & Info -->
+                    <div class="form-section">
+                        <h2 class="section-title">General Information</h2>
+
+                        <div class="form-group">
+                            <label for="bannerTitle">Banner Title (SEO)</label>
+                            <input type="text" id="bannerTitle" name="title" placeholder="e.g., Summer Sale 2025"
+                                required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="bannerDesc">Description (SEO)</label>
+                            <textarea id="bannerDesc" name="description" rows="3"
+                                placeholder="Brief description for search engines..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 2. Category Selection -->
+                    <div class="form-section">
+                        <h2 class="section-title">Category Mapping</h2>
+                        <div class="form-group">
+                            <label for="categorySelect">Main Category</label>
+                            <select id="categorySelect" required>
+                                <option value="">Select Category...</option>
+                                <!-- Dynamic Population -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 3. Product Linking -->
+                    <div class="form-section">
+                        <h2 class="section-title">Product Linking (Optional)</h2>
+                        <div class="product-search-wrapper">
+                            <input type="text" id="productSearch" placeholder="Search for a product by name...">
+                            <div id="productSearchResults" class="search-results hidden"></div>
+                        </div>
+                        <div id="selectedProductContainer" class="selected-product hidden">
+                            <span class="product-label">Selected:</span>
+                            <span id="selectedProductName" class="product-name">Product Name</span>
+                            <button type="button" id="clearProductBtn" class="btn-icon">&times;</button>
+                            <input type="hidden" id="selectedProductId">
+                        </div>
+                    </div>
+
+                    <!-- 4. Banner Configuration -->
+                    <div class="form-section">
+                        <h2 class="section-title">Banner Configuration</h2>
+
+                        <div class="banner-type-toggle">
+                            <label class="radio-card">
+                                <input type="radio" name="bannerType" value="single" checked>
+                                <div class="card-content">
+                                    <span class="card-title">Single Banner</span>
+                                    <span class="card-desc">One large hero image</span>
+                                </div>
+                            </label>
+                            <label class="radio-card">
+                                <input type="radio" name="bannerType" value="double">
+                                <div class="card-content">
+                                    <span class="card-title">Double Banner</span>
+                                    <span class="card-desc">Two side-by-side images</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 5. Banner A Upload -->
+                    <div class="form-section banner-slot-section" id="section-banner-a">
+                        <div class="section-header">
+                            <h3 class="slot-title">Banner A <span class="badge">Primary</span></h3>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="file-upload-box">
+                                <input type="file" id="uploadA" accept="image/*">
+                                <span class="upload-text">Click to Upload Image</span>
+                            </label>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>Alt Text</label>
+                                <input type="text" id="altA" placeholder="Image description">
+                            </div>
+                            <div class="form-group">
+                                <label>CTA Text</label>
+                                <input type="text" id="ctaA" placeholder="e.g., Shop Now">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Link Destination</label>
+                            <select id="linkTypeA">
+                                <option value="category">Specific Category</option>
+                                <option value="product">Specific Product</option>
+                                <option value="custom">Custom URL</option>
+                            </select>
+                        </div>
+
+                        <!-- Dynamic Link: Category A -->
+                        <div class="form-group hidden" id="linkCategoryGroupA">
+                            <label>Select Target Category</label>
+                            <div class="grid-3-mini" style="display: grid; gap: 0.5rem;">
+                                <select id="linkCatA_Main" class="text-sm">
+                                    <option value="">Select Main...</option>
+                                </select>
+                                <select id="linkCatA_Sub" disabled class="text-sm">
+                                    <option value="">Select Sub...</option>
+                                </select>
+                                <select id="linkCatA_SubSub" disabled class="text-sm">
+                                    <option value="">Select Sub-Sub...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Link: Product A -->
+                        <div class="form-group hidden" id="linkProductGroupA">
+                            <label>Search Target Product</label>
+                            <div style="position: relative;">
+                                <div class="product-search-wrapper">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                                        viewBox="0 0 24 24">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                    <input type="text" id="linkProdSearchA" placeholder="Search target product...">
+                                </div>
+                                <div id="linkProdResultsA" class="search-results hidden"></div>
+                            </div>
+                            <div id="linkProdSelectedContainerA" class="selected-product hidden">
+                                <span id="linkProdNameA" class="product-name"></span>
+                                <button type="button" id="linkProdClearA" class="btn-icon">&times;</button>
+                                <input type="hidden" id="linkProdIdA">
+                            </div>
+                        </div>
+
+                        <div class="form-group hidden" id="customLinkGroupA">
+                            <input type="text" id="customLinkA" placeholder="https://...">
+                        </div>
+                    </div>
+
+                    <!-- 6. Banner B Upload (Hidden by default) -->
+                    <div class="form-section banner-slot-section hidden" id="section-banner-b">
+                        <div class="section-header">
+                            <h3 class="slot-title">Banner B <span class="badge">Secondary</span></h3>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="file-upload-box">
+                                <input type="file" id="uploadB" accept="image/*">
+                                <span class="upload-text">Click to Upload Image</span>
+                            </label>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label>Alt Text</label>
+                                <input type="text" id="altB" placeholder="Image description">
+                            </div>
+                            <div class="form-group">
+                                <label>CTA Text</label>
+                                <input type="text" id="ctaB" placeholder="e.g., Learn More">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Link Destination</label>
+                            <select id="linkTypeB">
+                                <option value="category">Specific Category</option>
+                                <option value="product">Specific Product</option>
+                                <option value="custom">Custom URL</option>
+                            </select>
+                        </div>
+
+                        <!-- Dynamic Link: Category B -->
+                        <div class="form-group hidden" id="linkCategoryGroupB">
+                            <label>Select Target Category</label>
+                            <div class="grid-3-mini" style="display: grid; gap: 0.5rem;">
+                                <select id="linkCatB_Main" class="text-sm">
+                                    <option value="">Select Main...</option>
+                                </select>
+                                <select id="linkCatB_Sub" disabled class="text-sm">
+                                    <option value="">Select Sub...</option>
+                                </select>
+                                <select id="linkCatB_SubSub" disabled class="text-sm">
+                                    <option value="">Select Sub-Sub...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Link: Product B -->
+                        <div class="form-group hidden" id="linkProductGroupB">
+                            <label>Search Target Product</label>
+                            <div style="position: relative;">
+                                <div class="product-search-wrapper">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                                        viewBox="0 0 24 24">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                    <input type="text" id="linkProdSearchB" placeholder="Search target product...">
+                                </div>
+                                <div id="linkProdResultsB" class="search-results hidden"></div>
+                            </div>
+                            <div id="linkProdSelectedContainerB" class="selected-product hidden">
+                                <span id="linkProdNameB" class="product-name"></span>
+                                <button type="button" id="linkProdClearB" class="btn-icon">&times;</button>
+                                <input type="hidden" id="linkProdIdB">
+                            </div>
+                        </div>
+
+                        <div class="form-group hidden" id="customLinkGroupB">
+                            <input type="text" id="customLinkB" placeholder="https://...">
+                        </div>
+                    </div>
+
+                    <div class="form-actions sticky-footer">
+                        <button type="button" id="resetBtn" class="btn btn-secondary">Reset</button>
+                        <button type="submit" id="saveBtn" class="btn btn-primary">
+                            <span class="btn-text">Save Banner</span>
+                            <div class="spinner hidden"></div>
+                        </button>
+                    </div>
+
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <!-- Configs -->
+    <script src="../firebase-config.js"></script>
+    <script src="../dynamic-categories.js"></script>
+
+    <!-- Main Module Logic -->
+    <script src="banner-logic.js"></script>
+
+</body>
+
+</html>

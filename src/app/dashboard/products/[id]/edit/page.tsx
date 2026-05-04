@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, PlusCircle, Trash2, Package, Upload, X, ChevronDown, Info } from "lucide-react";
@@ -15,7 +15,8 @@ const GST_RATES = ["0","5","12","18","28"];
 
 interface Spec { name: string; value: string }
 
-export default function EditProductPage({ params }: { params: { id: string } }) {
+export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const router = useRouter();
   const [form, setForm] = useState<any>(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -26,11 +27,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const [specifications, setSpecifications] = useState<Spec[]>([{ name: "", value: "" }]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [categoriesData, setCategoriesData] = useState<any[]>([]);
+  const [openCats, setOpenCats] = useState<string[]>([]);
   const primaryInputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch(`/api/products/${params.id}`)
+    fetch(`/api/products/${resolvedParams.id}`)
       .then((r) => r.json())
       .then((data) => {
         setForm(data);
@@ -47,7 +50,15 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         setIsLoading(false);
       })
       .catch(() => setIsLoading(false));
-  }, [params.id]);
+
+    fetch('/api/categories').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setCategoriesData(data);
+    }).catch(console.error);
+  }, [resolvedParams.id]);
+
+  const toggleCat = (name: string) => {
+    setOpenCats(p => p.includes(name) ? p.filter(x => x !== name) : [...p, name]);
+  };
 
   const set = (key: string, val: any) => setForm((p: any) => ({ ...p, [key]: val }));
 
@@ -99,7 +110,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         features: features.filter(Boolean),
         specifications: specifications.filter((s) => s.name || s.value),
       };
-      const res = await fetch(`/api/products/${params.id}`, {
+      const res = await fetch(`/api/products/${resolvedParams.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -215,23 +226,68 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           </div>
         </div>
 
-        {/* Category */}
+        {/* Category Selection */}
         <div className={card}>
-          <p className={sectionTitle}><ChevronDown size={16} className="text-[#ffc800]" />Category</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div>
-              <label className={label}>Main Category</label>
-              <input type="text" value={form.mainCategory || ""} onChange={(e) => set("mainCategory", e.target.value)} placeholder="e.g., Lighting" className={inp} />
-            </div>
-            <div>
-              <label className={label}>Category</label>
-              <input type="text" value={form.category || ""} onChange={(e) => set("category", e.target.value)} placeholder="e.g., LED Bulbs" className={inp} />
-            </div>
-            <div>
-              <label className={label}>Subcategory</label>
-              <input type="text" value={form.subcategory || ""} onChange={(e) => set("subcategory", e.target.value)} placeholder="e.g., Smart Bulbs" className={inp} />
-            </div>
+          <p className={sectionTitle}><ChevronDown size={16} className="text-[#ffc800]" />Category Selection</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {categoriesData.length === 0 ? <div className="text-sm text-gray-500">Loading categories...</div> : categoriesData.map((catObj) => {
+              const main = catObj.id;
+              const subcategoriesObj = catObj.document?.subcategories || {};
+              const subs = Object.keys(subcategoriesObj);
+              
+              return (
+                <div key={main} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div
+                    onClick={() => toggleCat(main)}
+                    className={`p-3 flex items-center gap-3 cursor-pointer font-bold ${form.mainCategory === main ? 'bg-[#ffc800] text-gray-900' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  >
+                    <ChevronDown size={16} className={`transition-transform ${openCats.includes(main) ? "rotate-180" : ""}`} />
+                    <span className="flex-1">{main}</span>
+                  </div>
+                  {openCats.includes(main) && (
+                    <div className="p-3 bg-gray-50 flex flex-col gap-3 border-t border-gray-200">
+                      <div className="flex flex-wrap gap-2">
+                        {subs.map(sub => (
+                          <button
+                            key={sub} type="button"
+                            onClick={() => { set("mainCategory", main); set("category", sub); set("subcategory", ""); }}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium border ${form.category === sub && form.mainCategory === main ? 'border-yellow-400 bg-yellow-50 text-yellow-800' : 'border-gray-200 bg-white text-gray-600'}`}
+                          >{sub}</button>
+                        ))}
+                      </div>
+                      {form.mainCategory === main && form.category && subcategoriesObj[form.category]?.items && (
+                        <div className="mt-2 p-3 bg-white border border-gray-200 rounded-md">
+                          <label className="block text-xs font-bold text-gray-500 mb-2">Select Item / Subcategory:</label>
+                          <div className="flex flex-wrap gap-2">
+                            {subcategoriesObj[form.category].items.map((item: string) => (
+                              <button
+                                key={item} type="button"
+                                onClick={() => set("subcategory", item)}
+                                className={`px-2.5 py-1 rounded-md text-xs font-medium border ${form.subcategory === item ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}
+                              >{item}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="mt-2">
+                        <input
+                          type="text" placeholder="Other (type custom subcategory)"
+                          value={form.mainCategory === main ? form.subcategory : ""}
+                          onChange={e => { set("mainCategory", main); set("subcategory", e.target.value); }}
+                          className="border border-gray-300 rounded px-3 py-1.5 text-sm w-64 outline-none focus:border-yellow-400"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          {form.mainCategory && (
+            <p className="mt-3 text-sm text-green-600 font-medium">
+              ✓ Selected: <strong>{form.mainCategory}</strong> {form.category && `› ${form.category}`} {form.subcategory ? `› ${form.subcategory}` : ""}
+            </p>
+          )}
         </div>
 
         {/* Images */}
@@ -342,7 +398,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                   </div>
                 ))}
               </div>
-              <button type="button" onClick={() => addArr(setter, "")}
+              <button type="button" onClick={() => addArr(setter, "" as string)}
                 className="mt-3 flex items-center gap-1.5 text-sm text-[#ffc800] hover:text-yellow-600 font-semibold transition">
                 <PlusCircle size={15} /> Add
               </button>

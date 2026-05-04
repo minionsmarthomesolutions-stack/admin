@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Smartphone, Lightbulb, Save } from "lucide-react";
 import Link from "next/link";
@@ -23,8 +23,10 @@ interface BannerSlot {
   transform: { scale: number; x: number; y: number };
 }
 
-export default function AddBannerPage() {
+export default function EditBannerPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -66,6 +68,7 @@ export default function AddBannerPage() {
   const fileInputRefB = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Fetch categories
     fetch('/api/categories')
       .then(r => r.json())
       .then(data => {
@@ -78,7 +81,19 @@ export default function AddBannerPage() {
         }
       })
       .catch(console.error);
-  }, []);
+
+    // Fetch existing banner
+    fetch(`/api/banners/${resolvedParams.id}`)
+      .then(r => r.json())
+      .then(data => {
+        setFormData(data.document || data);
+        setIsLoading(false);
+      })
+      .catch(e => {
+        console.error(e);
+        setIsLoading(false);
+      });
+  }, [resolvedParams.id]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, slot: 'a' | 'b') => {
     const file = e.target.files?.[0];
@@ -239,8 +254,8 @@ export default function AddBannerPage() {
         }
       };
 
-      const res = await fetch("/api/banners", {
-        method: "POST",
+      const res = await fetch(`/api/banners/${resolvedParams.id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -377,10 +392,14 @@ export default function AddBannerPage() {
     );
   };
 
+  if (isLoading) {
+    return <div className="p-8 text-center text-gray-500">Loading banner data...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-24 font-sans text-gray-800">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
-        <h1 className="text-xl font-bold text-[#1E293B]">Banner/Ads Manager</h1>
+        <h1 className="text-xl font-bold text-[#1E293B]">Edit Banner</h1>
         <Link href="/dashboard/banners" className="px-4 py-2 border rounded text-sm hover:bg-gray-50">Back</Link>
       </header>
 
@@ -467,13 +486,13 @@ export default function AddBannerPage() {
 
         <div className="bg-white rounded border shadow-sm p-6">
           <h3 className="font-bold mb-4">General Settings</h3>
-          <input type="text" placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full border rounded p-2 mb-4 outline-none focus:border-blue-500" />
-          <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full border rounded p-2 mb-4 outline-none focus:border-blue-500" rows={3}></textarea>
+          <input type="text" placeholder="Title" value={formData.title || ""} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full border rounded p-2 mb-4 outline-none focus:border-blue-500" />
+          <textarea placeholder="Description" value={formData.description || ""} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full border rounded p-2 mb-4 outline-none focus:border-blue-500" rows={3}></textarea>
           
           <div className="flex items-center gap-3 mt-2">
             <label className="text-sm font-semibold text-gray-700">Status:</label>
             <select 
-              value={(formData as any).isActive === false ? "draft" : "active"} 
+              value={(formData as any).isActive ? "active" : "draft"} 
               onChange={e => setFormData({ ...formData, isActive: e.target.value === "active" } as any)} 
               className="border rounded p-1.5 text-sm outline-none focus:border-blue-500 bg-gray-50"
             >

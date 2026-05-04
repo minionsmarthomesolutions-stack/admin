@@ -7,16 +7,36 @@ import { PlusCircle, Search, BarChart2, Podcast } from "lucide-react";
 export default function BlogPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-
-  const stats = { total: 0, active: 0, groups: 0 };
+  const [blogs, setBlogs] = useState<any[]>([]);
 
   useEffect(() => {
-    // Simulate loading to match the exact requested UI
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    async function fetchBlogs() {
+      try {
+        const res = await fetch('/api/blogs');
+        if (res.ok) {
+          const data = await res.json();
+          setBlogs(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch blogs:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchBlogs();
   }, []);
+
+  const filteredBlogs = blogs.filter(b => 
+    b.title?.toLowerCase().includes(search.toLowerCase()) || 
+    b.category?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const stats = { 
+    total: blogs.length, 
+    active: blogs.filter(b => b.status === 'published' || b.status === 'active' || b.isActive).length, 
+    groups: new Set(blogs.map(b => b.category).filter(Boolean)).size 
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
@@ -78,6 +98,32 @@ export default function BlogPage() {
               <Podcast className="text-gray-200 w-12 h-12" />
               <p className="text-gray-400 font-medium">Loading blogs…</p>
             </div>
+          </div>
+        ) : filteredBlogs.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredBlogs.map(blog => (
+              <div key={blog.id} className="border border-gray-200 rounded-xl p-4 flex flex-col">
+                {blog.imageUrl || blog.primaryImage ? (
+                  <img src={blog.imageUrl || blog.primaryImage} alt={blog.title} className="w-full h-40 object-cover rounded-lg mb-4" />
+                ) : (
+                  <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-4 text-gray-400">
+                    No Image
+                  </div>
+                )}
+                <h3 className="font-semibold text-lg text-gray-800 mb-1">{blog.title || 'Untitled'}</h3>
+                <p className="text-sm text-gray-500 mb-3">{blog.category || 'Uncategorized'}</p>
+                <div className="mt-auto pt-4 border-t border-gray-100 flex justify-between items-center">
+                  <span className={`text-xs px-2 py-1 rounded-md font-medium ${
+                    blog.status === 'published' || blog.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {blog.status || (blog.isActive ? 'active' : 'draft')}
+                  </span>
+                  <Link href={`/dashboard/blog/${blog.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                    Edit
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-24 flex flex-col items-center border border-dashed border-gray-200 rounded-2xl">

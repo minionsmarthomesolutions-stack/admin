@@ -27,8 +27,8 @@ export default function BannerCard({ banner, onToggle, onDelete, onPreview, onEd
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition">
       <div className="relative h-48 bg-gray-50 flex items-center justify-center">
-        {banner.imageA ? (
-          <img src={banner.imageA} alt={banner.title} className="w-full h-full object-cover" />
+        {banner.banners?.a?.image ? (
+          <img src={banner.banners.a.image} alt={banner.title} className="w-full h-full object-cover" />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
             <ImageIcon size={32} className="mb-2" />

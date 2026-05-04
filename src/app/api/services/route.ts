@@ -1,7 +1,29 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from '@/lib/supabase';
 
-const prisma = new PrismaClient();
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*');
+      
+    if (error) throw error;
+    
+    const services = data.map(d => ({ id: d.id, ...(d.document || {}) }));
+    
+    // Sort by createdAt desc
+    services.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return NextResponse.json(services);
+  } catch (error: any) {
+    console.error('Error fetching services:', error);
+    return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +39,7 @@ export async function POST(req: Request) {
     let slug = slugBase;
     let counter = 1;
     while (true) {
-      const existing = await prisma.service.findUnique({ where: { slug } });
+      const { data: existing } = await supabase.from('services').select('id').eq('document->>slug', slug).maybeSingle();
       if (!existing) break;
       slug = `${slugBase}-${counter}`;
       counter++;
@@ -33,23 +55,31 @@ export async function POST(req: Request) {
       });
     }
 
-    const service = await prisma.service.create({
-      data: {
-        name: data.name,
-        slug: slug,
-        serviceCode: data.serviceCode,
-        description: data.description,
-        mainCategory: data.mainCategory,
-        category: data.category,
-        subcategory: data.subcategory,
-        galleryImages: data.galleryImages || [],
-        packages: processedPackages,
-        seoTags: data.seoTags || [],
-        status: data.status || 'draft',
-      }
-    });
+    const documentData = {
+      name: data.name,
+      slug: slug,
+      serviceCode: data.serviceCode,
+      description: data.description,
+      mainCategory: data.mainCategory,
+      category: data.category,
+      subcategory: data.subcategory,
+      galleryImages: data.galleryImages || [],
+      packages: processedPackages,
+      seoTags: data.seoTags || [],
+      status: data.status || 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    return NextResponse.json({ success: true, service });
+    const { data: service, error } = await supabase
+      .from('services')
+      .insert([{ document: documentData }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, service: { id: service.id, ...service.document } });
   } catch (error: any) {
     console.error('Error creating service:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

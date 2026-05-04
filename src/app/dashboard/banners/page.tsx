@@ -5,8 +5,10 @@ import Link from 'next/link';
 import BannerCard from '@/components/banners/BannerCard';
 import DeleteModal from '@/components/banners/DeleteModal';
 import { PlusCircle, Image as ImageIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function BannersPage() {
+  const router = useRouter();
   const [banners, setBanners] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bannerToDelete, setBannerToDelete] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export default function BannersPage() {
               onToggle={handleToggleStatus}
               onDelete={setBannerToDelete}
               onPreview={(b) => console.log('Previewing:', b)}
-              onEdit={(b) => console.log('Editing:', b)}
+              onEdit={(b) => router.push(`/dashboard/banners/${b.id}/edit`)}
             />
           ))}
         </div>
