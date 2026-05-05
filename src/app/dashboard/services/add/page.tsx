@@ -1,26 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Camera, 
   Home, 
   ChevronRight, 
-  Bold, 
-  Italic, 
-  Strikethrough, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  AlignJustify,
   List, 
   ListOrdered, 
   Image as ImageIcon, 
-  Undo,
-  Redo, 
-  Underline,
-  Link as LinkIcon,
-  Table,
-  CheckSquare,
   Gift,
   Copy,
   X,
@@ -28,6 +15,7 @@ import {
   Save,
   Palette
 } from "lucide-react";
+import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
 
 // Types for our dynamic form
 interface Feature {
@@ -330,6 +318,8 @@ export default function AddServicePage() {
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
   const [openCats, setOpenCats] = useState<string[]>([]);
   
+  const editorRef = useRef<RichEditorHandle>(null);
+  
   // Dynamic State
   const [serviceName, setServiceName] = useState("");
   const [serviceCode] = useState("SE45"); // Auto-generated mockup
@@ -372,7 +362,7 @@ export default function AddServicePage() {
       const payload = {
         name: serviceName,
         serviceCode: serviceCode || `SRV-${Math.floor(1000 + Math.random() * 9000)}`,
-        description: content,
+        description: editorRef.current?.getHTML() || content,
         mainCategory: selectedMain || '',
         category: selectedCat || '',
         subcategory: selectedSub || '',
@@ -486,79 +476,15 @@ export default function AddServicePage() {
         )}
       </div>
 
-      {/* Content Editor Toolbar */}
       <div className="mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-1">Content</h2>
         <p className="text-sm text-gray-600 mb-3">Write your service description with comprehensive formatting tools</p>
-        <div className="border-2 border-yellow-400 rounded-lg bg-white overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-200 p-2 flex flex-col gap-2">
-            {/* Top Row */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('undo')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><Undo size={16} /></button>
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('italic')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800 font-serif italic"><Italic size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('strikeThrough')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800 font-serif line-through"><Strikethrough size={16} /></button>
-              <select onChange={(e) => document.execCommand('fontName', false, e.target.value)} className="border border-gray-200 rounded px-2 py-1.5 text-sm bg-white min-w-[120px] font-bold outline-none text-gray-800">
-                <option value="Arial">Arial</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Courier New">Courier</option>
-              </select>
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-              <label className="flex items-center gap-1 border border-gray-200 bg-white rounded p-1 cursor-pointer hover:bg-gray-50">
-                 <div className="w-6 h-4 border-2 border-gray-400 bg-white"></div>
-                 <Palette size={14} className="text-yellow-500" />
-                 <input type="color" className="hidden" onChange={(e) => document.execCommand('hiliteColor', false, e.target.value)} />
-              </label>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyLeft')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><AlignLeft size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyCenter')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><AlignCenter size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('insertUnorderedList')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><List size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('outdent')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 flex flex-col gap-[3px] items-end justify-center w-8 h-8">
-                <div className="w-3.5 h-[2px] bg-gray-800"></div><div className="w-2.5 h-[2px] bg-gray-800"></div><div className="w-3.5 h-[2px] bg-gray-800"></div>
-              </button>
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-              <label className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800 cursor-pointer">
-                <ImageIcon size={16} />
-                <input type="file" className="hidden" accept="image/*" />
-              </label>
-            </div>
-            
-            {/* Bottom Row */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('redo')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><Redo size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('bold')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800 font-serif font-bold"><Bold size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('underline')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800 font-serif underline"><Underline size={16} /></button>
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-              <select onChange={(e) => document.execCommand('fontSize', false, e.target.value)} className="border border-gray-200 rounded px-2 py-1.5 text-sm bg-white min-w-[120px] font-bold outline-none text-gray-800">
-                <option value="3">12pt</option>
-                <option value="4">14pt</option>
-                <option value="5">18pt</option>
-                <option value="6">24pt</option>
-              </select>
-              <label className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 border border-gray-200 bg-white rounded p-1 w-8 h-8 justify-center">
-                 <div className="flex flex-col items-center justify-center">
-                    <div className="w-5 h-2 bg-black border border-gray-400 mb-0.5"></div>
-                    <span className="text-[9px] font-bold leading-none text-gray-800">A</span>
-                 </div>
-                 <input type="color" className="hidden" onChange={(e) => document.execCommand('foreColor', false, e.target.value)} />
-              </label>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyRight')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><AlignRight size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('justifyFull')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><AlignJustify size={16} /></button>
-              <div className="w-px h-6 bg-gray-300 mx-1"></div>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('insertOrderedList')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><ListOrdered size={16} /></button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => document.execCommand('indent')} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 flex flex-col gap-[3px] items-start justify-center w-8 h-8">
-                <div className="w-3.5 h-[2px] bg-gray-800"></div><div className="w-2.5 h-[2px] bg-gray-800"></div><div className="w-3.5 h-[2px] bg-gray-800"></div>
-              </button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = prompt('Enter link URL:'); if(url) document.execCommand('createLink', false, url); }} className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><LinkIcon size={16} /></button>
-              <button type="button" className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-100 text-gray-800"><Table size={16} /></button>
-            </div>
-          </div>
-          <div 
-            className="w-full h-64 p-4 text-gray-900 bg-white outline-none overflow-y-auto prose max-w-none" 
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => setContent(e.currentTarget.innerHTML)}
-          />
-        </div>
+        <RichEditor
+          ref={editorRef}
+          placeholder="Describe your service in detail…"
+          minHeight={280}
+          onChange={html => setContent(html)}
+        />
       </div>
 
       {/* Service Gallery Images */}

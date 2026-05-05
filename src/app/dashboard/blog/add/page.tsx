@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ArrowLeft, Image as ImageIcon, Link as LinkIcon, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Quote, Undo, Redo } from "lucide-react";
+import { Save, ArrowLeft, Image as ImageIcon } from "lucide-react";
 import CategorySelector from "@/components/ui/CategorySelector";
+import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
 
 export default function AddBlogPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function AddBlogPage() {
   const [selectedCat, setSelectedCat] = useState("");
   const [selectedSub, setSelectedSub] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<RichEditorHandle>(null);
 
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(data => {
@@ -71,7 +72,7 @@ export default function AddBlogPage() {
     setIsSaving(true);
     
     // Ensure we have the latest content from the editor
-    const finalContent = editorRef.current?.innerHTML || "";
+    const finalContent = editorRef.current?.getHTML() ?? "";
     const submitData = {
       ...formData,
       content: finalContent,
@@ -235,46 +236,12 @@ export default function AddBlogPage() {
               <p className="text-sm text-gray-500">Write your blog post content with comprehensive formatting tools</p>
             </div>
             <div className="p-6">
-              <div className="border border-gray-300 rounded-md overflow-hidden">
-                {/* Editor Toolbar */}
-                <div className="bg-gray-50 border-b border-gray-300 p-2 flex flex-wrap gap-2 items-center">
-                  <button type="button" onClick={() => execCommand('undo')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Undo size={16} /></button>
-                  <button type="button" onClick={() => execCommand('redo')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Redo size={16} /></button>
-                  <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                  <button type="button" onClick={() => execCommand('bold')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Bold size={16} /></button>
-                  <button type="button" onClick={() => execCommand('italic')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Italic size={16} /></button>
-                  <button type="button" onClick={() => execCommand('underline')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Underline size={16} /></button>
-                  <button type="button" onClick={() => execCommand('strikeThrough')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Strikethrough size={16} /></button>
-                  <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                  <button type="button" onClick={() => execCommand('justifyLeft')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><AlignLeft size={16} /></button>
-                  <button type="button" onClick={() => execCommand('justifyCenter')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><AlignCenter size={16} /></button>
-                  <button type="button" onClick={() => execCommand('justifyRight')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><AlignRight size={16} /></button>
-                  <button type="button" onClick={() => execCommand('justifyFull')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><AlignJustify size={16} /></button>
-                  <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                  <button type="button" onClick={() => execCommand('insertUnorderedList')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><List size={16} /></button>
-                  <button type="button" onClick={() => execCommand('insertOrderedList')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><ListOrdered size={16} /></button>
-                  <button type="button" onClick={() => execCommand('formatBlock', 'blockquote')} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><Quote size={16} /></button>
-                  <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                  <button type="button" onClick={() => {
-                    const url = prompt('Enter link URL:');
-                    if (url) execCommand('createLink', url);
-                  }} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><LinkIcon size={16} /></button>
-                  <button type="button" onClick={() => {
-                    const url = prompt('Enter image URL:');
-                    if (url) execCommand('insertImage', url);
-                  }} className="p-1.5 hover:bg-gray-200 rounded text-gray-700"><ImageIcon size={16} /></button>
-                </div>
-                
-                {/* Editable Area */}
-                <div 
-                  ref={editorRef}
-                  contentEditable
-                  onInput={handleContentChange}
-                  onBlur={handleContentChange}
-                  className="p-4 min-h-[400px] outline-none prose max-w-none focus:ring-inset focus:ring-2 focus:ring-[#ffd700]/50"
-                  style={{ minHeight: "400px" }}
-                />
-              </div>
+              <RichEditor
+                ref={editorRef}
+                placeholder="Write your blog post content here…"
+                minHeight={420}
+                onChange={html => setFormData(p => ({ ...p, content: html }))}
+              />
             </div>
           </div>
 
