@@ -1,0 +1,1825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Management | DECZON</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #ffc800;
+            --primary-dark: #ffc800;
+            --secondary-color: #f3f4f6;
+            --secondary-dark: #e5e7eb;
+            --success-color: #ffc800;
+            --error-color: #ef4444;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --border-color: #d1d5db;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            --spacing-2xl: 3rem;
+            --font-size-xs: 0.75rem;
+            --font-size-sm: 0.875rem;
+            --font-size-base: 1rem;
+            --font-size-lg: 1.125rem;
+            --font-size-xl: 1.25rem;
+            --font-size-2xl: 1.5rem;
+            --font-size-3xl: 1.875rem;
+            --font-size-4xl: 2.25rem;
+            --header-height: 80px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+             font-family: 'Nunito', sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--spacing-md);
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: var(--header-height);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+        }
+.logo-img {
+    height: 120px;
+    width: auto;
+}
+
+        .admin-user-info {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .btn-logout {
+            background: var(--error-color);
+            color: white;
+            border: none;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-logout:hover {
+            background: #b91c1c;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: var(--spacing-xl) 0;
+            min-height: calc(100vh - var(--header-height));
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+            padding: var(--spacing-xl) 0;
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .page-header h1 {
+            font-size: var(--font-size-4xl);
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .page-header p {
+            font-size: var(--font-size-lg);
+            color: var(--text-secondary);
+        }
+
+        /* Navigation Cards */
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .nav-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            box-shadow: var(--shadow-sm);
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .nav-card-icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .nav-card h3 {
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-primary);
+        }
+
+        .nav-card p {
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+        }
+
+        /* Category Management Section */
+        .category-management {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: var(--font-size-2xl);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary-dark);
+        }
+
+        /* Category Tree */
+        .category-tree {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+        }
+
+        .main-category-group {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .main-category-header {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-sm);
+            background: var(--text-primary);
+            color: white;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .main-category-header:hover {
+            background: #374151;
+        }
+
+        .main-category-content {
+            display: none;
+            padding-left: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+        }
+
+        .main-category-group.expanded .main-category-content {
+            display: block;
+        }
+
+        .category-group {
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-sm);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .category-header:hover {
+            background: var(--secondary-dark);
+        }
+
+        .category-arrow {
+            margin-right: var(--spacing-sm);
+            transition: transform 0.2s;
+        }
+
+        .category-group.expanded .category-arrow,
+        .main-category-group.expanded .category-arrow {
+            transform: rotate(90deg);
+        }
+
+        .subcategories {
+            display: none;
+            padding-left: var(--spacing-lg);
+            margin-top: var(--spacing-xs);
+        }
+
+        .category-group.expanded .subcategories {
+            display: block;
+        }
+
+        .subcategory-item {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            margin: 2px 0;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .subcategory-item:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Add Category Form */
+        .add-category-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+            margin-top: var(--spacing-lg);
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: var(--spacing-xs);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: var(--spacing-sm);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-base);
+            font-family: 'Nunito', sans-serif;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(12, 131, 31, 0.1);
+        }
+
+        .form-group.required label::after {
+            content: ' *';
+            color: var(--error-color);
+            font-weight: 600;
+        }
+
+        .form-group.error input,
+        .form-group.error select {
+            border-color: var(--error-color);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-group.error .error-message {
+            color: var(--error-color);
+            font-size: var(--font-size-xs);
+            margin-top: var(--spacing-xs);
+        }
+
+        .input-with-button {
+            display: flex;
+            gap: var(--spacing-sm);
+            align-items: flex-end;
+        }
+
+        .input-with-button input {
+            flex: 1;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            box-shadow: var(--shadow-lg);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: var(--font-size-xl);
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .btn-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+            justify-content: flex-end;
+            margin-top: var(--spacing-lg);
+        }
+
+        /* Loading */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .loading-overlay p {
+            color: white;
+            font-size: var(--font-size-lg);
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Success Message */
+        .success-message {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success-color);
+            color: white;
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            z-index: 3000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .success-message.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Logo Preview */
+        .logo-preview {
+            margin-top: var(--spacing-xs);
+            max-width: 100px;
+            max-height: 100px;
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .logo-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .logo-preview.empty {
+            height: 60px;
+            color: var(--text-muted);
+            font-size: var(--font-size-xs);
+        }
+
+        /* Category Tree with Logos */
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            flex: 1;
+        }
+
+        .category-actions {
+            display: flex;
+            gap: var(--spacing-xs);
+            margin-left: auto;
+        }
+
+        .btn-edit, .btn-delete {
+            padding: 2px 6px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-edit {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-delete {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #b91c1c;
+        }
+
+        .category-logo {
+            width: 24px;
+            height: 24px;
+            border-radius: var(--radius-sm);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .category-logo.empty {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .category-code {
+            font-size: var(--font-size-xs);
+            color: var(--primary-color);
+            font-weight: 600;
+            background: rgba(12, 131, 31, 0.1);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            margin-left: auto;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .add-category-form {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-with-button {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .page-header h1 {
+                font-size: var(--font-size-3xl);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                          <a href="index.html">
+                            <img src="../LOGO/d__1_-removebg-preview.png" alt="DECZON Logo" class="logo-img">
+                        </a>
+                    </div>
+                
+                <div class="header-right">
+                    <div class="admin-user-info">
+                        <span id="adminUserName">Admin</span>
+                        <button class="btn-logout" onclick="handleLogout()">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1>CATEGORY AND WARRANTY Management System</h1>
+            
+            </div>
+
+         
+            <!-- Category Management Section -->
+            <div class="category-management">
+                <div class="section-header">
+                    <h2 class="section-title">Category Management</h2>
+                    <button class="btn-primary" onclick="openAddCategoryModal()">Add New Category</button>
+                </div>
+                
+                <p style="margin-bottom: var(--spacing-lg); color: var(--text-secondary);">
+                    Manage the unified category structure used across products, services, and blog posts. 
+                    All items share the same three-level hierarchy: Main Category → Sub-Category → Sub-Sub-Category.
+                </p>
+
+                <div class="category-tree" id="category-tree">
+                    <!-- Categories will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Warranty Information Section -->
+            <div class="category-management">
+                <div class="section-header">
+                    <h2 class="section-title">Warranty Information</h2>
+                </div>
+                <p style="margin-bottom: var(--spacing-lg); color: var(--text-secondary);">
+                    Add warranty records with image, name, description, and price. Stored separately in Firebase.
+                </p>
+                <form id="warranty-form" class="add-category-form">
+                    <div class="form-group required">
+                        <label for="warranty-image">Warranty Image</label>
+                        <input type="file" id="warranty-image" accept="image/*" required>
+                    </div>
+                    <div class="form-group required">
+                        <label for="warranty-name">Warranty Name</label>
+                        <input type="text" id="warranty-name" placeholder="e.g., 2-Year Comprehensive Warranty" required>
+                    </div>
+                    <div class="form-group required" style="grid-column: 1 / -1;">
+                        <label for="warranty-description">Description</label>
+                        <textarea id="warranty-description" placeholder="Brief description of coverage" rows="4" style="width:100%; padding: var(--spacing-sm); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: 'Nunito', sans-serif; font-size: var(--font-size-base);" required></textarea>
+                    </div>
+                    <div class="form-group required">
+                        <label for="warranty-price">Price</label>
+                        <input type="number" id="warranty-price" placeholder="e.g., 1499.00" step="0.01" min="0" required>
+                    </div>
+                    <div class="modal-actions" style="grid-column: 1 / -1;">
+                        <button type="submit" class="btn-primary">Save Warranty</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Category Modal -->
+    <div id="add-category-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add New Category</h3>
+                <button class="btn-close" onclick="closeAddCategoryModal()">&times;</button>
+            </div>
+            
+            <form id="add-category-form">
+                <div class="form-group">
+                    <label for="category-type">Category Type</label>
+                    <select id="category-type" onchange="updateCategoryForm()">
+                        <option value="main">Main Category</option>
+                        <option value="sub">Sub-Category</option>
+                        <option value="subsub">Sub-Sub-Category</option>
+                    </select>
+                </div>
+
+                <div id="main-category-fields">
+                    <div class="form-group required">
+                        <label for="category-prefix">Category Prefix (e.g., SM)</label>
+                        <input type="text" id="category-prefix" placeholder="e.g., SM" maxlength="5">
+                    </div>
+                    <div class="form-group required">
+                        <label for="main-category-name">Main Category Name</label>
+                        <input type="text" id="main-category-name" placeholder="e.g., Automation Solutions">
+                    </div>
+                    <div class="form-group">
+                        <label for="main-category-logo">Category Logo (Optional)</label>
+                        <input type="file" id="main-category-logo" accept="image/*" onchange="previewLogo('main-category-logo', 'main-logo-preview')">
+                        <div id="main-logo-preview" class="logo-preview empty">No image selected</div>
+                    </div>
+                </div>
+
+                <div id="sub-category-fields" style="display: none;">
+                    <div class="form-group required">
+                        <label for="parent-main-category">Select Main Category</label>
+                        <select id="parent-main-category" onchange="updateSubCategoryForm()">
+                            <option value="">Choose main category...</option>
+                        </select>
+                    </div>
+                    <div class="form-group required">
+                        <label for="sub-category-name">Sub-Category Name</label>
+                        <input type="text" id="sub-category-name" placeholder="e.g., Lighting Automation">
+                    </div>
+                    <div class="form-group">
+                        <label for="sub-category-logo">Sub-Category Logo (Optional)</label>
+                        <input type="file" id="sub-category-logo" accept="image/*" onchange="previewLogo('sub-category-logo', 'sub-logo-preview')">
+                        <div id="sub-logo-preview" class="logo-preview empty">No image selected</div>
+                    </div>
+                </div>
+
+                <div id="subsub-category-fields" style="display: none;">
+                    <div class="form-group required">
+                        <label for="parent-main-category-subsub">Select Main Category</label>
+                        <select id="parent-main-category-subsub" onchange="updateSubCategories()">
+                            <option value="">Choose main category...</option>
+                        </select>
+                    </div>
+                    <div class="form-group required">
+                        <label for="parent-sub-category">Select Sub-Category</label>
+                        <select id="parent-sub-category">
+                            <option value="">Choose sub-category...</option>
+                        </select>
+                    </div>
+                    <div class="form-group required">
+                        <label for="subsub-category-name">Sub-Sub-Category Name</label>
+                        <input type="text" id="subsub-category-name" placeholder="e.g., Smart Bulbs">
+                    </div>
+                    <div class="form-group">
+                        <label for="subsub-category-logo">Sub-Sub-Category Logo (Optional)</label>
+                        <input type="file" id="subsub-category-logo" accept="image/*" onchange="previewLogo('subsub-category-logo', 'subsub-logo-preview')">
+                        <div id="subsub-logo-preview" class="logo-preview empty">No image selected</div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddCategoryModal()">Cancel</button>
+                    <button type="button" class="btn-secondary" onclick="testFormData()" style="margin-right: auto;">Test Form Data</button>
+                    <button type="submit" class="btn-primary">Add Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <!-- Success Message -->
+    <div id="success-message" class="success-message">
+        Category added successfully!
+    </div>
+
+         <script>
+         /*
+         * CATEGORY ID SYSTEM CONCEPT:
+         * 
+         * 1. MAIN CATEGORIES ONLY get category codes (e.g., SM00001 25-26)
+         *    - These codes are generated when creating main categories
+         *    - Each prefix (SM) has its own counter
+         * 
+         * 2. SUB-CATEGORIES and SUB-SUB-CATEGORIES do NOT get codes
+         *    - They inherit reference to their parent Main Category
+         *    - Display shows "Parent: SM" to indicate inheritance
+         * 
+         * 3. PRODUCT IDs are generated when adding products
+         *    - Uses Main Category prefix (e.g., SM)
+         *    - Increments counter for that prefix
+         *    - Format: SM00006 25-26 (where 00006 is the product number)
+         * 
+         * This ensures unique, sequential, and traceable IDs for products
+         * while maintaining clean category hierarchy.
+         */
+         
+         // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD152fC4d75Tzb1pGiBfuTfyJwZ4zyO_34",
+            authDomain: "deczon-faa54.firebaseapp.com",
+            projectId: "deczon-faa54",
+            storageBucket: "deczon-faa54.firebasestorage.app",
+            messagingSenderId: "816426698816",
+            appId: "1:816426698816:web:3d6d6268f69db01e0037a5",
+            measurementId: "G-7D1WDN68TX"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+        const auth = firebase.auth();
+
+        // No authentication required; keep a no-op to satisfy call sites
+        async function ensureAuth() {
+            return;
+        }
+
+        // Default categories structure
+        const defaultCategories = {
+            "Automation Solutions": {
+                code: "AS000012526",
+                logo: "",
+                subcategories: {
+                    "Lighting Automation": {
+                        logo: "",
+                        items: [
+                            "Smart Bulbs",
+                            "Smart Switches",
+                            "Motion Sensors",
+                            "Dimmer Controls",
+                            "Scene Controllers"
+                        ]
+                    },
+                    "Climate Control": {
+                        logo: "",
+                        items: [
+                            "Smart Thermostats",
+                            "Automated Fans",
+                            "Temperature Sensors",
+                            "HVAC Controllers"
+                        ]
+                    },
+                    "Security Automation": {
+                        logo: "",
+                        items: [
+                            "Smart Cameras",
+                            "Door Locks",
+                            "Alarm Systems",
+                            "Access Control"
+                        ]
+                    }
+                }
+            },
+            "Ceiling & Lighting Solutions": {
+                code: "CL000012526",
+                logo: "",
+                subcategories: {
+                    "Decorative Lighting": {
+                        logo: "",
+                        items: [
+                            "Chandeliers",
+                            "Pendant Lights",
+                            "Wall Sconces",
+                            "LED Strips",
+                            "Accent Lighting"
+                        ]
+                    },
+                    "Functional Lighting": {
+                        logo: "",
+                        items: [
+                            "Ceiling Lights",
+                            "Recessed Lighting",
+                            "Track Lighting",
+                            "Under Cabinet Lighting"
+                        ]
+                    },
+                    "Ceiling Systems": {
+                        logo: "",
+                        items: [
+                            "False Ceiling",
+                            "Suspended Ceiling",
+                            "Acoustic Ceiling",
+                            "LED Ceiling Panels"
+                        ]
+                    }
+                }
+            }
+        };
+
+        let categoriesData = {};
+        let categoryCounter = 1;
+        let prefixCounters = {}; // Track counter for each prefix separately
+
+        // Get current financial year
+        function getCurrentFinancialYear() {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const nextYear = currentYear + 1;
+            return `${currentYear.toString().slice(-2)}${nextYear.toString().slice(-2)}`;
+        }
+
+        // Generate unique category code for a specific prefix (ONLY for main categories)
+        function generateCategoryCode(prefix) {
+            const financialYear = getCurrentFinancialYear();
+            
+            // Initialize counter for this prefix if it doesn't exist
+            if (!prefixCounters[prefix]) {
+                prefixCounters[prefix] = 1;
+            }
+            
+            const paddedNumber = prefixCounters[prefix].toString().padStart(5, '0');
+            const code = `${prefix}${paddedNumber}${financialYear}`;
+            
+            // Increment counter for this specific prefix
+            prefixCounters[prefix]++;
+            
+            return code;
+        }
+
+        // Generate product ID using Main Category prefix (used when adding products)
+        async function generateProductId(mainCategoryName) {
+            if (!categoriesData[mainCategoryName] || !categoriesData[mainCategoryName].code) {
+                throw new Error('Main category not found or has no code');
+            }
+            
+            const parentPrefix = categoriesData[mainCategoryName].code.split('000')[0];
+            const financialYear = getCurrentFinancialYear();
+            
+            // Use Firebase for product counter
+            const counterRef = db.collection('productCounters').doc(`${parentPrefix}_${financialYear}`);
+            
+            try {
+                // Use Firebase transaction to ensure atomic increment
+                const result = await db.runTransaction(async (transaction) => {
+                    const doc = await transaction.get(counterRef);
+                    let currentCounter = 1;
+                    
+                    if (doc.exists) {
+                        currentCounter = (doc.data().counter || 0) + 1;
+                    }
+                    
+                    // Update the counter in Firebase
+                    transaction.set(counterRef, { 
+                        counter: currentCounter,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    return currentCounter;
+                });
+                
+                const paddedNumber = result.toString().padStart(5, '0');
+                const productId = `${parentPrefix}${paddedNumber}${financialYear}`;
+                
+                console.log(`🔢 Product Counter for ${parentPrefix}: ${result} (stored in Firebase)`);
+                
+                return productId;
+            } catch (error) {
+                console.error('Error getting product counter from Firebase:', error);
+                // Fallback to a timestamp-based approach if Firebase fails
+                const timestamp = Date.now();
+                const fallbackCounter = Math.floor(timestamp / 1000) % 100000;
+                const paddedNumber = fallbackCounter.toString().padStart(5, '0');
+                return `${parentPrefix}${paddedNumber}${financialYear}`;
+            }
+        }
+
+
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoading();
+            await initializeCategories();
+            await loadCategories();
+            hideLoading();
+        });
+
+        // Initialize categories with defaults if not exists
+        async function initializeCategories() {
+            try {
+                const doc = await db.collection('categories').doc('structure').get();
+                
+                if (!doc.exists) {
+                    // Create default categories
+                    await db.collection('categories').doc('structure').set({
+                        categories: defaultCategories,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    categoriesData = defaultCategories;
+                    console.log('Default categories initialized');
+                } else {
+                    categoriesData = doc.data().categories || {};
+                    console.log('Categories loaded from Firebase');
+                }
+            } catch (error) {
+                console.error('Error initializing categories:', error);
+                categoriesData = defaultCategories;
+            }
+        }
+
+        // Calculate category counter from existing data (ONLY main categories)
+        function calculateCategoryCounter() {
+            // Reset all prefix counters
+            prefixCounters = {};
+            
+            Object.keys(categoriesData).forEach(mainCategory => {
+                const mainCat = categoriesData[mainCategory];
+                if (mainCat.code) {
+                    const prefix = mainCat.code.split('000')[0];
+                    const number = parseInt(mainCat.code.split('000')[1].split(' ')[0]);
+                    
+                    if (!prefixCounters[prefix] || prefixCounters[prefix] <= number) {
+                        prefixCounters[prefix] = number + 1;
+                    }
+                }
+            });
+            
+            console.log('Prefix counters initialized (main categories only):', prefixCounters);
+        }
+
+        // Load and display categories
+        async function loadCategories() {
+            try {
+                const doc = await db.collection('categories').doc('structure').get();
+                if (doc.exists) {
+                    categoriesData = doc.data().categories || {};
+                }
+                calculateCategoryCounter();
+                displayCategories();
+                updateCategorySelects();
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                categoriesData = defaultCategories;
+                calculateCategoryCounter();
+                displayCategories();
+                updateCategorySelects();
+            }
+        }
+
+        // Display categories in the tree
+        function displayCategories() {
+            const categoryTree = document.getElementById('category-tree');
+            let html = '';
+
+            Object.keys(categoriesData).forEach(mainCategory => {
+                const mainCat = categoriesData[mainCategory];
+                const logoDisplay = mainCat.logo ? 
+                    `<img src="${mainCat.logo}" alt="${mainCategory}" class="category-logo">` : 
+                    '<div class="category-logo empty">🏠</div>';
+
+                html += `
+                    <div class="main-category-group">
+                        <div class="main-category-header" onclick="toggleMainCategory(this)">
+                            <span class="category-arrow">▶</span>
+                            ${logoDisplay}
+                            <div class="category-item">
+                                <strong>${mainCategory}</strong>
+                                <span class="category-code">${mainCat.code}</span>
+                            </div>
+                            <div class="category-actions" onclick="event.stopPropagation()">
+                                <button class="btn-edit" onclick="editCategory('main', '${mainCategory}')">Edit</button>
+                                <button class="btn-delete" onclick="deleteCategory('main', '${mainCategory}')">Delete</button>
+                            </div>
+                        </div>
+                        <div class="main-category-content">
+                `;
+
+                if (mainCat.subcategories) {
+                    Object.keys(mainCat.subcategories).forEach(subCategory => {
+                        const subCat = mainCat.subcategories[subCategory];
+                        const subLogoDisplay = subCat.logo ? 
+                            `<img src="${subCat.logo}" alt="${subCategory}" class="category-logo">` : 
+                            '<div class="category-logo empty">🔧</div>';
+
+                        html += `
+                            <div class="category-group">
+                                <div class="category-header" onclick="toggleCategory(this)">
+                                    <span class="category-arrow">▶</span>
+                                    ${subLogoDisplay}
+                                    <div class="category-item">
+                                        ${subCategory}
+                                        <span class="category-code" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">Parent: ${mainCat.code.split('000')[0]}</span>
+                                    </div>
+                                    <div class="category-actions" onclick="event.stopPropagation()">
+                                        <button class="btn-edit" onclick="editCategory('sub', '${mainCategory}', '${subCategory}')">Edit</button>
+                                        <button class="btn-delete" onclick="deleteCategory('sub', '${mainCategory}', '${subCategory}')">Delete</button>
+                                    </div>
+                                </div>
+                                <div class="subcategories">
+                        `;
+
+                        if (subCat.items) {
+                            subCat.items.forEach(subSubCategory => {
+                                const subSubLogo = subCat.itemLogos && subCat.itemLogos[subSubCategory] ? 
+                                    `<img src="${subCat.itemLogos[subSubCategory]}" alt="${subSubCategory}" class="category-logo">` : 
+                                    '<div class="category-logo empty">📦</div>';
+
+                                html += `
+                                    <div class="subcategory-item" onclick="event.stopPropagation()">
+                                        ${subSubLogo}
+                                        <span>${subSubCategory}</span>
+                                        <div class="category-actions">
+                                            <button class="btn-edit" onclick="editCategory('subsub', '${mainCategory}', '${subCategory}', '${subSubCategory}')">Edit</button>
+                                            <button class="btn-delete" onclick="deleteCategory('subsub', '${mainCategory}', '${subCategory}', '${subSubCategory}')">Delete</button>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        }
+
+                        html += `
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            categoryTree.innerHTML = html;
+        }
+
+        // Toggle main category expansion
+        function toggleMainCategory(header) {
+            const group = header.parentElement;
+            group.classList.toggle('expanded');
+        }
+
+        // Toggle category expansion
+        function toggleCategory(header) {
+            const group = header.parentElement;
+            group.classList.toggle('expanded');
+        }
+
+        // Open add category modal
+        function openAddCategoryModal() {
+            document.getElementById('add-category-modal').classList.add('active');
+            updateCategoryForm();
+            updateCategorySelects();
+        }
+
+        // Close add category modal
+        function closeAddCategoryModal() {
+            document.getElementById('add-category-modal').classList.remove('active');
+            
+            // Reset form fields
+            document.getElementById('add-category-form').reset();
+            
+            // Clear logo previews
+            const logoPreviews = ['main-logo-preview', 'sub-logo-preview', 'subsub-logo-preview'];
+            logoPreviews.forEach(previewId => {
+                const preview = document.getElementById(previewId);
+                if (preview) {
+                    preview.innerHTML = '<div class="empty">No image selected</div>';
+                }
+            });
+            
+            // Reset form display
+            updateCategoryForm();
+            
+            // Reset edit mode
+            if (window.editingCategory) {
+                window.editingCategory = null;
+                const submitBtn = document.querySelector('#add-category-form button[type="submit"]');
+                submitBtn.textContent = 'Add Category';
+            }
+            
+            // Clear any error states
+            console.log('Modal closed, form reset');
+        }
+
+
+
+
+
+        // Update category form based on type
+        function updateCategoryForm() {
+            const categoryType = document.getElementById('category-type').value;
+            const mainFields = document.getElementById('main-category-fields');
+            const subFields = document.getElementById('sub-category-fields');
+            const subsubFields = document.getElementById('subsub-category-fields');
+
+            // Hide all fields first
+            mainFields.style.display = 'none';
+            subFields.style.display = 'none';
+            subsubFields.style.display = 'none';
+
+            // Remove required attributes from all fields first
+            const allRequiredInputs = document.querySelectorAll('input[required], select[required]');
+            allRequiredInputs.forEach(input => input.removeAttribute('required'));
+
+            // Show relevant fields and add required attributes
+            if (categoryType === 'main') {
+                mainFields.style.display = 'block';
+                document.getElementById('category-prefix').setAttribute('required', 'required');
+                document.getElementById('main-category-name').setAttribute('required', 'required');
+            } else if (categoryType === 'sub') {
+                subFields.style.display = 'block';
+                document.getElementById('parent-main-category').setAttribute('required', 'required');
+                document.getElementById('sub-category-name').setAttribute('required', 'required');
+            } else if (categoryType === 'subsub') {
+                subsubFields.style.display = 'block';
+                document.getElementById('parent-main-category-subsub').setAttribute('required', 'required');
+                document.getElementById('parent-sub-category').setAttribute('required', 'required');
+                document.getElementById('subsub-category-name').setAttribute('required', 'required');
+            }
+        }
+
+        // Update category select options
+        function updateCategorySelects() {
+            const mainCategorySelects = [
+                document.getElementById('parent-main-category'),
+                document.getElementById('parent-main-category-subsub')
+            ];
+
+            mainCategorySelects.forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="">Choose main category...</option>';
+                    Object.keys(categoriesData).forEach(mainCategory => {
+                        const option = document.createElement('option');
+                        option.value = mainCategory;
+                        option.textContent = mainCategory;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        }
+
+        // Update sub-categories based on selected main category
+        function updateSubCategories() {
+            const mainCategorySelect = document.getElementById('parent-main-category-subsub');
+            const subCategorySelect = document.getElementById('parent-sub-category');
+            const selectedMain = mainCategorySelect.value;
+
+            subCategorySelect.innerHTML = '<option value="">Choose sub-category...</option>';
+
+            if (selectedMain && categoriesData[selectedMain] && categoriesData[selectedMain].subcategories) {
+                Object.keys(categoriesData[selectedMain].subcategories).forEach(subCategory => {
+                    const option = document.createElement('option');
+                    option.value = subCategory;
+                    option.textContent = subCategory;
+                    subCategorySelect.appendChild(option);
+                });
+            }
+        }
+
+        // Update sub-category form when main category changes
+        function updateSubCategoryForm() {
+            const mainCategorySelect = document.getElementById('parent-main-category');
+            const selectedMain = mainCategorySelect.value;
+            
+            if (selectedMain && categoriesData[selectedMain]) {
+                // Update category prefix field with main category prefix
+                const prefix = categoriesData[selectedMain].code.split('000')[0];
+                document.getElementById('category-prefix').value = prefix;
+            }
+        }
+
+        // Preview logo image
+        function previewLogo(inputId, previewId) {
+            const input = document.getElementById(inputId);
+            const preview = document.getElementById(previewId);
+            const file = input.files[0];
+
+            if (file) {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.innerHTML = `<img src="${e.target.result}" alt="Logo Preview">`;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    alert('Please select a valid image file.');
+                    input.value = '';
+                }
+            } else {
+                preview.innerHTML = '<div class="empty">No image selected</div>';
+            }
+        }
+
+        // Upload logo to Firebase Storage
+        async function uploadLogo(file, categoryPath) {
+            try {
+                const storageRef = storage.ref();
+                const logoRef = storageRef.child(`category-logos/${categoryPath}/${Date.now()}_${file.name}`);
+                const snapshot = await logoRef.put(file);
+                const downloadURL = await snapshot.ref.getDownloadURL();
+                return downloadURL;
+            } catch (error) {
+                console.error('Error uploading logo:', error);
+                throw error;
+            }
+        }
+
+        // Edit category
+        function editCategory(categoryType, mainCategory, subCategory = null, subsubCategory = null) {
+            console.log('Editing category:', { categoryType, mainCategory, subCategory, subsubCategory });
+            
+            // Open modal in edit mode
+            openAddCategoryModal();
+            
+            // Set category type
+            document.getElementById('category-type').value = categoryType;
+            updateCategoryForm();
+            
+            if (categoryType === 'main') {
+                const mainCat = categoriesData[mainCategory];
+                document.getElementById('category-prefix').value = mainCat.code.split('000')[0];
+                document.getElementById('main-category-name').value = mainCategory;
+                // TODO: Handle logo display
+                
+            } else if (categoryType === 'sub') {
+                const subCat = categoriesData[mainCategory].subcategories[subCategory];
+                document.getElementById('parent-main-category').value = mainCategory;
+                document.getElementById('sub-category-name').value = subCategory;
+                // TODO: Handle logo display
+                
+            } else if (categoryType === 'subsub') {
+                const subsubCat = categoriesData[mainCategory].subcategories[subCategory];
+                document.getElementById('parent-main-category-subsub').value = mainCategory;
+                // Ensure sub-category options are populated for the selected main
+                updateSubCategories();
+                document.getElementById('parent-sub-category').value = subCategory;
+                document.getElementById('subsub-category-name').value = subsubCategory;
+                // TODO: Handle logo display
+            }
+            
+            // Change button text to indicate edit mode
+            const submitBtn = document.querySelector('#add-category-form button[type="submit"]');
+            submitBtn.textContent = 'Update Category';
+            
+            // Store edit data
+            window.editingCategory = { categoryType, mainCategory, subCategory, subsubCategory };
+        }
+
+        // Delete category
+        function deleteCategory(categoryType, mainCategory, subCategory = null, subsubCategory = null) {
+            const categoryName = subsubCategory || subCategory || mainCategory;
+            const confirmMessage = `Are you sure you want to delete "${categoryName}"? This action cannot be undone.`;
+            
+            if (confirm(confirmMessage)) {
+                try {
+                    if (categoryType === 'main') {
+                        // Delete main category and all its sub-categories
+                        delete categoriesData[mainCategory];
+                        
+                    } else if (categoryType === 'sub') {
+                        // Delete sub-category and all its items
+                        delete categoriesData[mainCategory].subcategories[subCategory];
+                        
+                    } else if (categoryType === 'subsub') {
+                        // Delete sub-sub-category
+                        const items = categoriesData[mainCategory].subcategories[subCategory].items;
+                        const index = items.indexOf(subsubCategory);
+                        if (index > -1) {
+                            items.splice(index, 1);
+                        }
+                        
+                        // Remove logo if exists
+                        if (categoriesData[mainCategory].subcategories[subCategory].itemLogos) {
+                            delete categoriesData[mainCategory].subcategories[subCategory].itemLogos[subsubCategory];
+                        }
+                    }
+                    
+                    // Save to Firebase
+                    saveCategoriesToFirebase();
+                    
+                    // Refresh display
+                    displayCategories();
+                    updateCategorySelects();
+                    
+                    showSuccessMessage('Category deleted successfully!');
+                    
+                } catch (error) {
+                    console.error('Error deleting category:', error);
+                    alert('Error deleting category. Please try again.');
+                }
+            }
+        }
+
+        // Save categories to Firebase
+        async function saveCategoriesToFirebase() {
+            try {
+                await db.collection('categories').doc('structure').set({
+                    categories: categoriesData,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (error) {
+                console.error('Error saving to Firebase:', error);
+                throw error;
+            }
+        }
+
+        // Check if category name already exists
+        function checkCategoryExists(categoryType, categoryName, parentMain = null, parentSub = null) {
+            if (categoryType === 'main') {
+                return categoriesData[categoryName] ? true : false;
+            } else if (categoryType === 'sub') {
+                return categoriesData[parentMain] && 
+                       categoriesData[parentMain].subcategories && 
+                       categoriesData[parentMain].subcategories[categoryName] ? true : false;
+            } else if (categoryType === 'subsub') {
+                return categoriesData[parentMain] && 
+                       categoriesData[parentMain].subcategories && 
+                       categoriesData[parentMain].subcategories[parentSub] &&
+                       categoriesData[parentMain].subcategories[parentSub].items.includes(categoryName) ? true : false;
+            }
+            return false;
+        }
+
+        // Validate form fields
+        function validateForm(categoryType) {
+            const errors = [];
+            
+            if (categoryType === 'main') {
+                const prefix = document.getElementById('category-prefix').value.trim();
+                const name = document.getElementById('main-category-name').value.trim();
+                
+                if (!prefix) errors.push('Category prefix is required');
+                if (!name) errors.push('Category name is required');
+                if (prefix.length > 5) errors.push('Category prefix cannot exceed 5 characters');
+                
+            } else if (categoryType === 'sub') {
+                const parentMain = document.getElementById('parent-main-category').value;
+                const name = document.getElementById('sub-category-name').value.trim();
+                
+                if (!parentMain) errors.push('Please select a main category');
+                if (!name) errors.push('Sub-category name is required');
+                
+            } else if (categoryType === 'subsub') {
+                const parentMain = document.getElementById('parent-main-category-subsub').value;
+                const parentSub = document.getElementById('parent-sub-category').value;
+                const name = document.getElementById('subsub-category-name').value.trim();
+                
+                if (!parentMain) errors.push('Please select a main category');
+                if (!parentSub) errors.push('Please select a sub-category');
+                if (!name) errors.push('Sub-sub-category name is required');
+            }
+            
+            return errors;
+        }
+
+        // Handle add category form submission
+        document.getElementById('add-category-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const categoryType = document.getElementById('category-type').value;
+            const isEditing = window.editingCategory;
+            
+            // Validate form first
+            const validationErrors = validateForm(categoryType);
+            if (validationErrors.length > 0) {
+                alert('Please fix the following errors:\n\n' + validationErrors.join('\n'));
+                return;
+            }
+            
+            showLoading();
+
+            try {
+                let success = false;
+                let logoURL = '';
+                let errorMessage = '';
+
+                if (categoryType === 'main') {
+                    const prefix = document.getElementById('category-prefix').value.trim().toUpperCase();
+                    const mainCategoryName = document.getElementById('main-category-name').value.trim();
+                    const logoFile = document.getElementById('main-category-logo').files[0];
+
+                    if (isEditing) {
+                        // Handle edit mode
+                        const oldName = window.editingCategory.mainCategory;
+                        if (oldName !== mainCategoryName && checkCategoryExists(categoryType, mainCategoryName)) {
+                            errorMessage = `Category "${mainCategoryName}" already exists`;
+                        } else {
+                            // Update existing category
+                            if (oldName !== mainCategoryName) {
+                                // Name changed, need to update references
+                                const oldData = categoriesData[oldName];
+                                delete categoriesData[oldName];
+                                categoriesData[mainCategoryName] = oldData;
+                            }
+                            
+                            // Update logo if new one selected
+                            if (logoFile) {
+                                logoURL = await uploadLogo(logoFile, `main/${mainCategoryName}`);
+                                categoriesData[mainCategoryName].logo = logoURL;
+                            }
+                            
+                            success = true;
+                        }
+                    } else {
+                        // Handle add mode
+                        if (checkCategoryExists(categoryType, mainCategoryName)) {
+                            errorMessage = `Category "${mainCategoryName}" already exists`;
+                        } else {
+                            // Generate category code
+                            const categoryCode = generateCategoryCode(prefix);
+                            
+                            // Upload logo if selected
+                            if (logoFile) {
+                                logoURL = await uploadLogo(logoFile, `main/${mainCategoryName}`);
+                            }
+
+                            // Create main category structure
+                            categoriesData[mainCategoryName] = {
+                                code: categoryCode,
+                                logo: logoURL,
+                                subcategories: {}
+                            };
+                            success = true;
+                        }
+                    }
+                } else if (categoryType === 'sub') {
+                    const parentMain = document.getElementById('parent-main-category').value;
+                    const subCategoryName = document.getElementById('sub-category-name').value.trim();
+                    const logoFile = document.getElementById('sub-category-logo').files[0];
+
+                    // Validate sub-category fields
+                    if (!parentMain) {
+                        errorMessage = 'Please select a main category';
+                    } else if (!subCategoryName) {
+                        errorMessage = 'Sub-category name is required';
+                    } else if (!categoriesData[parentMain]) {
+                        errorMessage = 'Selected main category not found';
+                    } else if (checkCategoryExists(categoryType, subCategoryName, parentMain)) {
+                        errorMessage = `Sub-category "${subCategoryName}" already exists under "${parentMain}"`;
+                    } else {
+                        // Sub-categories do NOT get codes - they inherit parent reference
+                        // Upload logo if selected
+                        if (logoFile) {
+                            logoURL = await uploadLogo(logoFile, `sub/${parentMain}/${subCategoryName}`);
+                        }
+
+                        // Create sub-category structure WITHOUT code
+                        categoriesData[parentMain].subcategories[subCategoryName] = {
+                            logo: logoURL,
+                            items: []
+                        };
+                        success = true;
+                    }
+                } else if (categoryType === 'subsub') {
+                    const parentMain = document.getElementById('parent-main-category-subsub').value;
+                    const parentSub = document.getElementById('parent-sub-category').value;
+                    const subsubCategoryName = document.getElementById('subsub-category-name').value.trim();
+                    const logoFile = document.getElementById('subsub-category-logo').files[0];
+
+                    // Validate sub-sub-category fields
+                    if (!parentMain) {
+                        errorMessage = 'Please select a main category';
+                    } else if (!parentSub) {
+                        errorMessage = 'Please select a sub-category';
+                    } else if (!subsubCategoryName) {
+                        errorMessage = 'Sub-sub-category name is required';
+                    } else if (!categoriesData[parentMain]) {
+                        errorMessage = 'Selected main category not found';
+                    } else if (!categoriesData[parentMain].subcategories[parentSub]) {
+                        errorMessage = 'Selected sub-category not found';
+                    } else if (isEditing) {
+                        // Edit existing sub-sub-category
+                        const { subsubCategory: oldName } = window.editingCategory;
+                        const items = categoriesData[parentMain].subcategories[parentSub].items;
+                        const oldIndex = items.indexOf(oldName);
+                        if (oldIndex === -1) {
+                            errorMessage = 'Original sub-sub-category not found';
+                        } else if (oldName !== subsubCategoryName && checkCategoryExists(categoryType, subsubCategoryName, parentMain, parentSub)) {
+                            errorMessage = `Sub-sub-category "${subsubCategoryName}" already exists under "${parentSub}"`;
+                        } else {
+                            // Update name in items array
+                            items[oldIndex] = subsubCategoryName;
+                            // Handle logos map
+                            if (!categoriesData[parentMain].subcategories[parentSub].itemLogos) {
+                                categoriesData[parentMain].subcategories[parentSub].itemLogos = {};
+                            }
+                            const logosMap = categoriesData[parentMain].subcategories[parentSub].itemLogos;
+                            const existingLogo = logosMap[oldName] || '';
+                            // If name changed, move existing logo reference
+                            if (oldName !== subsubCategoryName) {
+                                delete logosMap[oldName];
+                                logosMap[subsubCategoryName] = existingLogo;
+                            }
+                            // If a new logo file provided, upload and overwrite
+                            if (logoFile) {
+                                logoURL = await uploadLogo(logoFile, `subsub/${parentMain}/${parentSub}/${subsubCategoryName}`);
+                                logosMap[subsubCategoryName] = logoURL;
+                            }
+                            success = true;
+                        }
+                    } else if (checkCategoryExists(categoryType, subsubCategoryName, parentMain, parentSub)) {
+                        errorMessage = `Sub-sub-category "${subsubCategoryName}" already exists under "${parentSub}"`;
+                    } else {
+                        // Sub-sub-categories do NOT get codes - they inherit parent reference
+                        // Upload logo if selected
+                        if (logoFile) {
+                            logoURL = await uploadLogo(logoFile, `subsub/${parentMain}/${parentSub}/${subsubCategoryName}`);
+                        }
+
+                        // Add sub-sub-category WITHOUT code
+                        categoriesData[parentMain].subcategories[parentSub].items.push(subsubCategoryName);
+                        
+                        // Store logo URL in a separate structure for sub-sub categories
+                        if (!categoriesData[parentMain].subcategories[parentSub].itemLogos) {
+                            categoriesData[parentMain].subcategories[parentSub].itemLogos = {};
+                        }
+                        categoriesData[parentMain].subcategories[parentSub].itemLogos[subsubCategoryName] = logoURL;
+                        
+                        success = true;
+                    }
+                }
+
+                if (success) {
+                    // Save to Firebase
+                    await saveCategoriesToFirebase();
+
+                    displayCategories();
+                    updateCategorySelects();
+                    closeAddCategoryModal();
+                    
+                    if (isEditing) {
+                        showSuccessMessage('Category updated successfully!');
+                        // Reset edit mode
+                        window.editingCategory = null;
+                        const submitBtn = document.querySelector('#add-category-form button[type="submit"]');
+                        submitBtn.textContent = 'Add Category';
+                    } else {
+                        showSuccessMessage('Category added successfully!');
+                    }
+                } else {
+                    // Show specific error message
+                    alert(errorMessage || 'Please fill all required fields or check for duplicates.');
+                }
+            } catch (error) {
+                console.error('Error adding category:', error);
+                alert(`Error adding category: ${error.message}. Please try again.`);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Test function to debug form data
+        function testFormData() {
+            const categoryType = document.getElementById('category-type').value;
+            
+            console.log('=== FORM DATA TEST ===');
+            console.log('Category Type:', categoryType);
+            
+            if (categoryType === 'main') {
+                const prefix = document.getElementById('category-prefix').value.trim();
+                const mainCategoryName = document.getElementById('main-category-name').value.trim();
+                
+                console.log('Prefix:', prefix);
+                console.log('Category Name:', mainCategoryName);
+                console.log('Prefix length:', prefix.length);
+                console.log('Name length:', mainCategoryName.length);
+                console.log('Category exists:', checkCategoryExists(categoryType, mainCategoryName));
+                
+            } else if (categoryType === 'sub') {
+                const parentMain = document.getElementById('parent-main-category').value;
+                const subCategoryName = document.getElementById('sub-category-name').value.trim();
+                
+                console.log('Parent Main Category:', parentMain);
+                console.log('Sub-Category Name:', subCategoryName);
+                console.log('Sub-Category exists:', checkCategoryExists(categoryType, subCategoryName, parentMain));
+                
+            } else if (categoryType === 'subsub') {
+                const parentMain = document.getElementById('parent-main-category-subsub').value;
+                const parentSub = document.getElementById('parent-sub-category').value;
+                const subsubCategoryName = document.getElementById('subsub-category-name').value.trim();
+                
+                console.log('Parent Main Category:', parentMain);
+                console.log('Parent Sub-Category:', parentSub);
+                console.log('Sub-Sub-Category Name:', subsubCategoryName);
+                console.log('Sub-Sub-Category exists:', checkCategoryExists(categoryType, subsubCategoryName, parentMain, parentSub));
+            }
+            
+            console.log('Categories Data:', categoriesData);
+            console.log('=====================');
+        }
+
+        // Utility functions
+        function showLoading() {
+            document.getElementById('loading-overlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.remove('active');
+        }
+
+        function showSuccessMessage(message = 'Category added successfully!') {
+            const successMessage = document.getElementById('success-message');
+            successMessage.textContent = message;
+            successMessage.classList.add('active');
+            setTimeout(() => {
+                successMessage.classList.remove('active');
+            }, 3000);
+        }
+
+        function handleLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                // Add logout logic here
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Warranty: upload image to Firebase Storage
+        async function uploadWarrantyImage(file) {
+            await ensureAuth();
+            const storageRef = storage.ref();
+            const imgRef = storageRef.child(`warranty-images/${Date.now()}_${file.name}`);
+            const snapshot = await imgRef.put(file);
+            const url = await snapshot.ref.getDownloadURL();
+            return url;
+        }
+
+        // Warranty: handle form submit and save to separate collection
+        document.addEventListener('DOMContentLoaded', () => {
+            const warrantyForm = document.getElementById('warranty-form');
+            if (warrantyForm) {
+                warrantyForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await ensureAuth();
+                    const imageFile = document.getElementById('warranty-image').files[0];
+                    const name = document.getElementById('warranty-name').value.trim();
+                    const description = document.getElementById('warranty-description').value.trim();
+                    const priceValue = document.getElementById('warranty-price').value;
+
+                    if (!imageFile || !name || !description || priceValue === '') {
+                        alert('Please fill all required fields.');
+                        return;
+                    }
+
+                    const price = Number(priceValue);
+                    if (Number.isNaN(price) || price < 0) {
+                        alert('Please enter a valid non-negative price.');
+                        return;
+                    }
+
+                    showLoading();
+                    try {
+                        const imageUrl = await uploadWarrantyImage(imageFile);
+                        await db.collection('warranties').add({
+                            name,
+                            description,
+                            price,
+                            imageUrl,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        // Reset form on success
+                        warrantyForm.reset();
+                        showSuccessMessage('Warranty saved successfully!');
+                    } catch (err) {
+                        console.error('Error saving warranty:', err);
+                        alert('Error saving warranty. Please try again.');
+                    } finally {
+                        hideLoading();
+                    }
+                });
+            }
+        });
+
+        // Make categories data globally available for other pages
+        window.getCategoriesData = () => categoriesData;
+        window.loadCategories = loadCategories;
+        window.generateProductId = generateProductId;
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoading();
+            await ensureAuth();
+            await initializeCategories();
+            await loadCategories();
+            hideLoading();
+        });
+    </script>

@@ -6,22 +6,9 @@ import {
   Camera, 
   Home, 
   ChevronRight, 
-  Bold, 
-  Italic, 
-  Strikethrough, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  AlignJustify,
   List, 
   ListOrdered, 
   Image as ImageIcon, 
-  Undo,
-  Redo, 
-  Underline,
-  Link as LinkIcon,
-  Table,
-  CheckSquare,
   Gift,
   Copy,
   X,
@@ -29,6 +16,7 @@ import {
   Save,
   Palette
 } from "lucide-react";
+import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
 
 // Types for our dynamic form
 interface Feature {
@@ -714,6 +702,8 @@ export default function AddServicePage() {
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
   const [openCats, setOpenCats] = useState<string[]>([]);
   
+  const editorRef = useRef<RichEditorHandle>(null);
+  
   // Dynamic State
   const [serviceName, setServiceName] = useState("");
   const [serviceCode] = useState("SE45"); // Auto-generated mockup
@@ -777,7 +767,7 @@ export default function AddServicePage() {
       const payload = {
         name: serviceName,
         serviceCode: serviceCode || `SRV-${Math.floor(1000 + Math.random() * 9000)}`,
-        description: content,
+        description: editorRef.current?.getHTML() || content,
         mainCategory: selectedMain || '',
         category: selectedCat || '',
         subcategory: selectedSub || '',

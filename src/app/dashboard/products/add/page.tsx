@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
 
 /* ─────────────────────────── types ─────────────────────────── */
 interface Spec  { name: string; value: string }
@@ -30,91 +31,13 @@ interface MaterialVariant {
   thumbnails: string[];
 }
 
-/* ───────────────────── category data ───────────────────────── */
-// Fetched dynamically now
-
-/* ─────────────────────── RichTextEditor ─────────────────────── */
-function RichTextEditor({ placeholder }: { placeholder?: string }) {
-  const editorRef = useRef<HTMLDivElement>(null);
-
-  const exec = (cmd: string, val?: string) => {
-    editorRef.current?.focus();
-    document.execCommand(cmd, false, val ?? undefined);
-  };
-
-  const barBtn = (label: string, cmd: string, val?: string) => (
-    <button
-      type="button"
-      key={cmd + label}
-      onMouseDown={(e) => { e.preventDefault(); exec(cmd, val); }}
-      style={{ minWidth: 26, height: 24, padding: "0 4px", border: "1px solid #ccc", background: "#fff", cursor: "pointer", fontSize: 12, borderRadius: 2, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-      title={label}
-    >
-      {label}
-    </button>
-  );
-
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 4, background: "#fff" }}>
-      {/* Toolbar Row 1 */}
-      <div style={{ borderBottom: "1px solid #eee", padding: "4px 6px", display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
-        <button type="button" onMouseDown={(e)=>{e.preventDefault();exec("bold")}} style={{minWidth:26,height:24,padding:"0 4px",border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontSize:12,borderRadius:2,fontWeight:"bold"}} title="Bold">B</button>
-        <button type="button" onMouseDown={(e)=>{e.preventDefault();exec("italic")}} style={{minWidth:26,height:24,padding:"0 4px",border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontSize:12,borderRadius:2,fontStyle:"italic"}} title="Italic">I</button>
-        <button type="button" onMouseDown={(e)=>{e.preventDefault();exec("underline")}} style={{minWidth:26,height:24,padding:"0 4px",border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontSize:12,borderRadius:2,textDecoration:"underline"}} title="Underline">U</button>
-        <button type="button" onMouseDown={(e)=>{e.preventDefault();exec("strikeThrough")}} style={{minWidth:36,height:24,padding:"0 4px",border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontSize:12,borderRadius:2}} title="Strikethrough">Sért</button>
-        <span style={{width:1,height:20,background:"#ddd",margin:"0 4px"}} />
-        <select onChange={(e)=>{exec("fontName", e.target.value)}} defaultValue="Arial" style={{height:24,fontSize:11,border:"1px solid #ccc",borderRadius:2,padding:"0 2px",background:"#fff"}}>
-          {["Arial","Helvetica","Times New Roman","Georgia","Verdana","Courier New","Inter","Roboto","Open Sans","Lato","Montserrat","Poppins"].map(f=><option key={f}>{f}</option>)}
-        </select>
-        <select onChange={(e)=>{exec("fontSize", e.target.value)}} defaultValue="3" style={{height:24,fontSize:11,border:"1px solid #ccc",borderRadius:2,padding:"0 2px",background:"#fff"}}>
-          <option value="1">8pt</option><option value="2">10pt</option><option value="3">12pt</option><option value="4">14pt</option><option value="5">18pt</option><option value="6">24pt</option><option value="7">36pt</option>
-        </select>
-        <span style={{fontSize:11,color:"#555",minWidth:28,textAlign:"center"}}>12pt</span>
-        <span style={{width:1,height:20,background:"#ddd",margin:"0 4px"}} />
-        {/* Colors */}
-        <label title="Text Color" style={{cursor:"pointer"}}>
-          <span style={{fontSize:12,padding:"0 4px",border:"1px solid #ccc",background:"#fff",height:24,display:"inline-flex",alignItems:"center",borderRadius:2}}>🎨</span>
-          <input type="color" style={{display:"none"}} onChange={e=>{exec("foreColor",e.target.value)}} />
-        </label>
-        <label title="Highlight" style={{cursor:"pointer"}}>
-          <span style={{fontSize:12,padding:"0 4px",border:"1px solid #ccc",background:"#fff",height:24,display:"inline-flex",alignItems:"center",borderRadius:2}}>🖊</span>
-          <input type="color" style={{display:"none"}} onChange={e=>{exec("hiliteColor",e.target.value)}} />
-        </label>
-        <button type="button" onMouseDown={(e)=>{e.preventDefault()}} title="Paint Format" style={{minWidth:26,height:24,padding:"0 4px",border:"1px solid #ccc",background:"#17a2b8",color:"white",cursor:"pointer",fontSize:12,borderRadius:2}}>🖌</button>
-      </div>
-      {/* Toolbar Row 2 */}
-      <div style={{ borderBottom: "1px solid #eee", padding: "4px 6px", display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
-        {barBtn("X₂","subscript")} {barBtn("X²","superscript")}
-        <span style={{width:1,height:20,background:"#ddd",margin:"0 4px"}} />
-        {barBtn("≡L","justifyLeft")} {barBtn("≡C","justifyCenter")} {barBtn("≡R","justifyRight")} {barBtn("≡J","justifyFull")}
-        <span style={{width:1,height:20,background:"#ddd",margin:"0 4px"}} />
-        {barBtn("1.","insertOrderedList")} {barBtn("•","insertUnorderedList")} {barBtn("⬅","outdent")} {barBtn("➡","indent")}
-        <span style={{width:1,height:20,background:"#ddd",margin:"0 4px"}} />
-        {barBtn("—","insertHorizontalRule")} {barBtn("❝","formatBlock","blockquote")} {barBtn("</>","formatBlock","pre")}
-        <span style={{width:1,height:20,background:"#ddd",margin:"0 4px"}} />
-        {barBtn("🧹","removeFormat")} {barBtn("↶","undo")} {barBtn("↷","redo")}
-      </div>
-      {/* Editable area */}
-      <div
-        ref={editorRef}
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder={placeholder || "Enter detailed product description with advanced formatting..."}
-        style={{ minHeight: 120, padding: "10px 12px", outline: "none", fontSize: 14, lineHeight: 1.6, color: "#111" }}
-        onKeyDown={(e) => {
-          if (e.ctrlKey && e.key === "b") { e.preventDefault(); exec("bold"); }
-          if (e.ctrlKey && e.key === "i") { e.preventDefault(); exec("italic"); }
-          if (e.ctrlKey && e.key === "u") { e.preventDefault(); exec("underline"); }
-        }}
-      />
-      <style>{`.rich-editor-empty:empty:before{content:attr(data-placeholder);color:#9ca3af;pointer-events:none}`}</style>
-    </div>
-  );
-}
 
 /* ─────────────────────── main component ─────────────────────── */
 export default function AddProductPage() {
   const router = useRouter();
+
+  /* description editor ref */
+  const descRef = useRef<RichEditorHandle>(null);
 
   /* category state */
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
@@ -266,7 +189,7 @@ export default function AddProductPage() {
         specifications: specs.filter(s => s.name || s.value),
         warranty: null,
         isActive: true,
-        description: null,
+        description: descRef.current?.getHTML() ?? null,
       };
       const res = await fetch("/api/products", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -408,7 +331,11 @@ export default function AddProductPage() {
             </div>
             <div style={fgStyle}>
               <label style={labelStyle}>Product Description *</label>
-              <RichTextEditor placeholder="Enter detailed product description with advanced formatting..." />
+              <RichEditor
+                ref={descRef}
+                placeholder="Enter detailed product description with advanced formatting..."
+                minHeight={180}
+              />
             </div>
           </div>
 
