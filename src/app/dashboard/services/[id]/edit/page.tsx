@@ -161,7 +161,10 @@ const ServiceGallery = ({
   const renderSlot = (slotIndex: number) => {
     const slot = GALLERY_SLOTS[slotIndex];
     const img = images[slotIndex];
-    return (
+    if (isLoading) return <div className="p-12 text-center text-gray-500 animate-pulse">Loading service data...</div>;
+  if (!isFound) return <div className="p-12 text-center text-red-500 font-bold">Service not found.</div>;
+  
+  return (
       <div
         key={slotIndex}
         className={`relative group border-2 rounded-lg overflow-hidden cursor-pointer transition-all
@@ -633,90 +636,18 @@ const PackageSection = ({
 };
 
 
-// ── Mock data for quick form testing ─────────────────────────────────────────
-const MOCK_DATA = {
-  serviceName: "Smart Home Automation Setup",
-  selectedMain: "Smart Home",
-  selectedCat: "Lighting & Automation",
-  selectedSub: "Full Home Automation",
-  seoTags: "smart home, home automation, IoT setup, voice control, smart lighting",
-  content: `<h2>Complete Smart Home Automation</h2>
-<p>Transform your home into a fully automated smart living space. Our expert technicians install and configure industry-leading smart home devices, ensuring seamless integration with voice assistants like Alexa and Google Home.</p>
-<ul>
-  <li>Smart lighting control (dimmers, RGB, motion-triggered)</li>
-  <li>Automated climate control with smart thermostats</li>
-  <li>Security cameras, smart locks &amp; alarm integration</li>
-  <li>Wi-Fi mesh setup &amp; network optimisation</li>
-  <li>One app to control everything</li>
-</ul>
-<p><strong>Coverage:</strong> All major brands — Philips Hue, Ring, Nest, TP-Link, Tuya, Xiaomi &amp; more.</p>`,
-  packages: {
-    basic: {
-      priceInfo: "Starting from ₹4,999",
-      pricePopup: "4999",
-      included: [
-        { id: "b1", title: "Smart Bulb Installation",      description: "Up to 5 smart bulbs installed and configured" },
-        { id: "b2", title: "Single Room Automation",       description: "One room fully automated with scenes" },
-        { id: "b3", title: "App Setup",                    description: "Mobile app configured for remote control" },
-        { id: "b4", title: "Voice Assistant Pairing",      description: "Alexa or Google Home integration" },
-      ],
-      notIncluded: [
-        { id: "bn1", title: "Multi-room Control",          description: "Only one room covered in this plan" },
-        { id: "bn2", title: "Security Camera Setup",       description: "Not included — upgrade to Premium" },
-      ],
-      complimentary: [
-        { id: "bc1", title: "30-min Training Session",     description: "Walk-through of the app and features" },
-      ],
-    },
-    premium: {
-      priceInfo: "Starting from ₹12,999",
-      pricePopup: "12999",
-      included: [
-        { id: "p1", title: "Whole-home Smart Lighting",    description: "Up to 20 smart bulbs + smart switches" },
-        { id: "p2", title: "Smart Thermostat",             description: "Nest or equivalent installation" },
-        { id: "p3", title: "Security Camera (2 units)",    description: "Indoor/outdoor HD cameras configured" },
-        { id: "p4", title: "Smart Lock Installation",      description: "Front door smart lock with PIN &amp; app" },
-        { id: "p5", title: "Wi-Fi Mesh Setup",             description: "Up to 3-node mesh for full coverage" },
-        { id: "p6", title: "Automation Scenes",            description: "Wake-up, Movie, Away, Sleep scenes" },
-      ],
-      notIncluded: [
-        { id: "pn1", title: "Solar Integration",           description: "Requires Elite plan" },
-      ],
-      complimentary: [
-        { id: "pc1", title: "1-Year Remote Support",       description: "Free remote troubleshooting for 12 months" },
-        { id: "pc2", title: "60-min Training",             description: "Comprehensive hands-on training session" },
-      ],
-    },
-    elite: {
-      priceInfo: "Custom pricing — from ₹29,999",
-      pricePopup: "29999",
-      included: [
-        { id: "e1", title: "Full Home Automation",         description: "Every room fully smart &amp; automated" },
-        { id: "e2", title: "Central Control Hub",          description: "Dedicated home automation hub device" },
-        { id: "e3", title: "Solar &amp; Energy Monitoring", description: "Real-time energy dashboard integration" },
-        { id: "e4", title: "8 Security Cameras",           description: "Professional outdoor + indoor placement" },
-        { id: "e5", title: "Smart Blinds / Curtains",      description: "Motorised shading with schedule control" },
-        { id: "e6", title: "Intercom System",              description: "Video doorbell + internal intercom" },
-        { id: "e7", title: "Custom Dashboard",             description: "Branded wall-mounted control panel" },
-      ],
-      notIncluded: [],
-      complimentary: [
-        { id: "ec1", title: "2-Year On-site Warranty",     description: "Free on-site repairs for 24 months" },
-        { id: "ec2", title: "Quarterly Health Check",      description: "4 visits/year by certified technician" },
-        { id: "ec3", title: "Priority 24/7 Support",       description: "Dedicated support line, response < 2hrs" },
-      ],
-    },
-  },
-};
-
-export default function AddServicePage() {
+export default function EditServicePage() {
+  const params = useParams();
+  const serviceId = params.id as string;
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFound, setIsFound] = useState(true);
   const router = useRouter();
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
   const [openCats, setOpenCats] = useState<string[]>([]);
   
   // Dynamic State
   const [serviceName, setServiceName] = useState("");
-  const [serviceCode] = useState("SE45"); // Auto-generated mockup
+  const [serviceCode, setServiceCode] = useState("");
   const [selectedMain, setSelectedMain] = useState("");
   const [selectedCat, setSelectedCat] = useState("");
   const [selectedSub, setSelectedSub] = useState("");
@@ -738,24 +669,6 @@ export default function AddServicePage() {
 
   // Gallery images — 5 slots matching the HTML layout (base64 strings sent to API)
   const [galleryImages, setGalleryImages] = useState<(string | null)[]>([null, null, null, null, null]);
-
-  // ── Fill all fields with mock data for quick testing ──────────────────────
-  const fillMockData = () => {
-    setServiceName(MOCK_DATA.serviceName);
-    setSelectedMain(MOCK_DATA.selectedMain);
-    setSelectedCat(MOCK_DATA.selectedCat);
-    setSelectedSub(MOCK_DATA.selectedSub);
-    setSeoTags(MOCK_DATA.seoTags);
-    setContent(MOCK_DATA.content);
-    setPackages({
-      basic:   { ...MOCK_DATA.packages.basic },
-      premium: { ...MOCK_DATA.packages.premium },
-      elite:   { ...MOCK_DATA.packages.elite },
-    });
-    // Update the contenteditable editor visually
-    const editor = document.getElementById('desc-editor') as HTMLElement | null;
-    if (editor) editor.innerHTML = MOCK_DATA.content;
-  };
 
   const updatePackage = (pkgKey: 'basic'|'premium'|'elite', data: ServicePackage) => {
     setPackages(prev => ({ ...prev, [pkgKey]: data }));
@@ -787,8 +700,8 @@ export default function AddServicePage() {
         status: status
       };
 
-      const res = await fetch('/api/services', {
-        method: 'POST',
+      const res = await fetch(`/api/services/${serviceId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -807,21 +720,6 @@ export default function AddServicePage() {
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto font-sans pb-24">
-      {/* ── Mock Data Banner ── */}
-      <div className="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-yellow-800">🧪 Testing Mode</p>
-          <p className="text-xs text-yellow-600 mt-0.5">Pre-fill all fields with realistic sample data to test the form quickly.</p>
-        </div>
-        <button
-          type="button"
-          onClick={fillMockData}
-          className="shrink-0 bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 shadow-sm"
-        >
-          ✨ Fill Mock Data
-        </button>
-      </div>
-
       {/* Basic Info */}
       <div className="mb-6">
         <label className="block text-sm font-bold text-gray-800 mb-2">Service Name</label>

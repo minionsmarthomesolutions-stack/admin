@@ -125,7 +125,7 @@ export default function ProductsPage() {
       </div>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
           { label: "Total Products", value: stats.total, color: "text-[#ffc800]" },
           { label: "Active Products", value: stats.active, color: "text-emerald-500" },
@@ -158,7 +158,7 @@ export default function ProductsPage() {
               </div>
             )}
             {/* Search */}
-            <div className="relative">
+            <div className="relative w-full">
               <Search
                 size={15}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
@@ -168,7 +168,7 @@ export default function ProductsPage() {
                 value={search}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder="Search name, category, group…"
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition w-64 bg-gray-50"
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition w-full sm:w-64 bg-gray-50"
               />
             </div>
           </div>

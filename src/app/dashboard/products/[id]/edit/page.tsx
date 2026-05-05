@@ -188,7 +188,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         {/* Pricing */}
         <div className={card}>
           <p className={sectionTitle}><span className="text-[#ffc800] font-bold text-lg">₹</span>Pricing &amp; Stock</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             <div>
               <label className={label}>Selling Price (₹) <span className="text-red-500">*</span></label>
               <input type="number" min="0" step="0.01" value={form.currentPrice || ""} onChange={(e) => set("currentPrice", e.target.value)} placeholder="0.00" className={inp} />
@@ -345,7 +345,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         {/* Specifications */}
         <div className={card}>
           <p className={sectionTitle}><Info size={16} className="text-[#ffc800]" />Specifications</p>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[400px]">
             <thead>
               <tr className="text-xs text-gray-400 border-b border-gray-100">
                 <th className="text-left font-semibold py-2 pr-4 w-1/2">Name</th>
@@ -371,6 +372,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
               ))}
             </tbody>
           </table>
+          </div>
           <button type="button" onClick={() => addArr(setSpecifications, { name: "", value: "" })}
             className="mt-3 flex items-center gap-2 text-sm text-[#ffc800] hover:text-yellow-600 font-semibold transition">
             <PlusCircle size={16} /> Add Specification
@@ -431,7 +433,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         {/* Visibility */}
         <div className={card}>
           <p className={sectionTitle}>Visibility &amp; Status</p>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className={label}>Product Status</label>
               <select value={form.status || "active"} onChange={(e) => set("status", e.target.value)} className={inp}>
@@ -452,7 +454,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
       </form>
 
       {/* Fixed Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-6 py-4 flex justify-end gap-3 z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 py-4 flex flex-wrap justify-end gap-3 z-50">
         <Link href="/dashboard/products" className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition">Cancel</Link>
         <button onClick={() => handleSubmit()} disabled={isSaving}
           className="px-8 py-2.5 rounded-xl bg-[#ffc800] text-white text-sm font-bold hover:bg-yellow-500 transition shadow-sm disabled:opacity-60 flex items-center gap-2">

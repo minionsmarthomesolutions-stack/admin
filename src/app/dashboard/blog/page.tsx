@@ -56,7 +56,7 @@ export default function BlogPage() {
       </div>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
           { label: "Total Blogs", value: stats.total, color: "text-[#ffc800]" },
           { label: "Active Blogs", value: stats.active, color: "text-emerald-500" },
@@ -77,7 +77,7 @@ export default function BlogPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-800">Your Blogs</h2>
-          <div className="relative">
+          <div className="relative w-full">
             <Search
               size={15}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
@@ -87,7 +87,7 @@ export default function BlogPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search blogs..."
-              className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition w-64 bg-gray-50"
+              className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition w-full sm:w-64 bg-gray-50"
             />
           </div>
         </div>

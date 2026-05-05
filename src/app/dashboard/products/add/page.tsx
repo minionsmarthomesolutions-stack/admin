@@ -305,7 +305,8 @@ export default function AddProductPage() {
         <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>Add Product</h1>
       </header>
 
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 24px 120px" }}>
+      {/* ── Main content wrapper: use padding + max-width + responsive padding ── */}
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 120px" }}>
 
         {/* ── Category Selection ── */}
         <div style={fgStyle}>
@@ -394,9 +395,9 @@ export default function AddProductPage() {
         </div>
 
         {/* ── Product Basics + Right Panel ── */}
-        <div style={{ display: "flex", gap: 30, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 30, marginBottom: 20, flexWrap: "wrap" }}>
           {/* Left – Name + Description */}
-          <div style={{ flex: 2 }}>
+          <div style={{ flex: "2 1 280px", minWidth: 0 }}>
             <div style={fgStyle}>
               <label style={labelStyle} htmlFor="global-product-name">Product Name *</label>
               <input
@@ -412,7 +413,7 @@ export default function AddProductPage() {
           </div>
 
           {/* Right – GST, HSN, Vendor, Brand, Stock, Qty, Delivery, Shipping */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: "1 1 240px", minWidth: 0 }}>
             <div style={fgStyle}>
               <label style={labelStyle} htmlFor="global-gst-rate">GST Rate (%) *</label>
               <select id="global-gst-rate" value={gstRate} onChange={e => setGstRate(e.target.value)} style={inputStyle}>
@@ -478,7 +479,7 @@ export default function AddProductPage() {
         {/* ── Global Specifications ── */}
         <div style={fgStyle}>
           <label style={labelStyle}>Global Product Specifications *</label>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 4, overflow: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#ffc000" }}>
@@ -668,7 +669,7 @@ export default function AddProductPage() {
       </main>
 
       {/* ── Sticky Submit Bar ── */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 24px", display: "flex", justifyContent: "flex-end", gap: 12, zIndex: 50, boxShadow: "0 -4px 16px rgba(0,0,0,.06)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "flex-end", gap: 12, zIndex: 50, boxShadow: "0 -4px 16px rgba(0,0,0,.06)", flexWrap: "wrap" }}>
         <Link href="/dashboard/products"
           style={{ padding: "8px 20px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, color: "#374151", textDecoration: "none", display: "flex", alignItems: "center" }}>
           Cancel

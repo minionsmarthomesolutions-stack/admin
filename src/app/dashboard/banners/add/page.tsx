@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Smartphone, Lightbulb, Save } from "lucide-react";
+import { Smartphone, Lightbulb, Save, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+
+const DRAFT_KEY = "banner_form_draft";
 
 interface LinkData {
   main: string;
@@ -55,7 +57,14 @@ export default function AddBannerPage() {
   const [activeSlot, setActiveSlot] = useState<'a' | 'b'>('a');
   const [isMobileView, setIsMobileView] = useState(false);
   const [categoriesMap, setCategoriesMap] = useState<any>({});
-  
+
+  // Draft states
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
   // product search states
   const [searchQueryA, setSearchQueryA] = useState("");
   const [searchResultsA, setSearchResultsA] = useState<any[]>([]);
@@ -64,6 +73,60 @@ export default function AddBannerPage() {
 
   const fileInputRefA = useRef<HTMLInputElement>(null);
   const fileInputRefB = useRef<HTMLInputElement>(null);
+
+  // ── Draft helpers ──────────────────────────────────────────────
+  const saveDraft = useCallback((data: typeof formData) => {
+    try {
+      const draft = { formData: data, savedAt: new Date().toISOString() };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setDraftTime(t);
+      setDraftStatus('saved');
+    } catch {
+      setDraftStatus('unsaved');
+    }
+  }, []);
+
+  const discardDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
+    setDraftStatus('idle');
+  };
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const { formData: saved } = JSON.parse(raw);
+      setFormData(saved);
+      setHasDraft(false);
+      setDraftStatus('saved');
+    } catch {
+      setHasDraft(false);
+    }
+  };
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      try {
+        const { savedAt } = JSON.parse(raw);
+        const t = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setDraftTime(t);
+        setHasDraft(true);
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Auto-save: trigger 5 s after each formData change
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setDraftStatus('saving');
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => saveDraft(formData), 5000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [formData, saveDraft]);
 
   useEffect(() => {
     fetch('/api/categories')
@@ -246,6 +309,7 @@ export default function AddBannerPage() {
       });
 
       if (res.ok) {
+        localStorage.removeItem(DRAFT_KEY);
         alert("Banner successfully saved!");
         router.push("/dashboard/banners");
         router.refresh();
@@ -304,7 +368,7 @@ export default function AddBannerPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Alt Text</label>
             <input type="text" value={slotData.alt} onChange={e => updateSlot({ alt: e.target.value })} className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none" />
@@ -325,7 +389,7 @@ export default function AddBannerPage() {
         </div>
 
         {slotData.linkType === 'category' && (
-          <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
             <select value={slotData.linkData.main} onChange={e => updateLink({ main: e.target.value, sub: "", subSub: "" })} className="border rounded px-2 py-1 text-sm outline-none">
               <option value="">Main Category...</option>
               {mainCategories.map((c: string) => <option key={c} value={c}>{c}</option>)}
@@ -377,6 +441,14 @@ export default function AddBannerPage() {
     );
   };
 
+  const draftStatusLabel = draftStatus === 'saving'
+    ? 'Auto-saving…'
+    : draftStatus === 'saved'
+    ? `Draft saved ${draftTime ? 'at ' + draftTime : ''}`
+    : draftStatus === 'unsaved'
+    ? 'Failed to save draft'
+    : 'No changes';
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-24 font-sans text-gray-800">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -385,6 +457,26 @@ export default function AddBannerPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="max-w-6xl mx-auto mt-6 px-4 flex flex-col gap-6">
+
+        {/* Draft restore bar */}
+        {hasDraft && (
+          <div className="flex items-center justify-between gap-4 bg-yellow-50 border border-yellow-300 rounded-xl px-5 py-3 shadow-sm flex-wrap">
+            <div className="flex items-center gap-2 text-yellow-800 text-sm font-medium flex-1">
+              <AlertTriangle size={16} className="text-yellow-500 shrink-0" />
+              Unsaved draft found from {draftTime}. Restore it to continue where you left off.
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={restoreDraft}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition">
+                Restore Draft
+              </button>
+              <button type="button" onClick={discardDraft}
+                className="bg-transparent border border-gray-300 text-gray-600 hover:border-red-300 hover:text-red-600 text-sm px-4 py-1.5 rounded-lg transition">
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
         
         {/* Preview Section */}
         <div className="bg-white rounded border shadow-sm">
@@ -515,10 +607,35 @@ export default function AddBannerPage() {
         {renderSlotConfig('a')}
         {formData.type === 'double' && renderSlotConfig('b')}
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-end z-50">
-          <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded flex items-center gap-2 hover:bg-blue-700">
-            <Save size={16} /> Save Banner
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between z-50 gap-3">
+          {/* Draft status badge */}
+          <div className={`flex items-center gap-2 text-xs font-medium ${
+            draftStatus === 'saving'  ? 'text-amber-500' :
+            draftStatus === 'saved'   ? 'text-emerald-600' :
+            draftStatus === 'unsaved' ? 'text-red-500' : 'text-gray-400'
+          }`}>
+            <span className={`w-2 h-2 rounded-full inline-block ${
+              draftStatus === 'saving'  ? 'bg-amber-400 animate-pulse' :
+              draftStatus === 'saved'   ? 'bg-emerald-500' :
+              draftStatus === 'unsaved' ? 'bg-red-400' : 'bg-gray-300'
+            }`} />
+            {draftStatusLabel}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Manual save draft */}
+            <button
+              type="button"
+              onClick={() => saveDraft(formData)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition"
+            >
+              <Clock size={15} /> Save as Draft
+            </button>
+
+            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 font-medium transition shadow-sm">
+              <Save size={16} /> Publish Banner
+            </button>
+          </div>
         </div>
 
       </form>

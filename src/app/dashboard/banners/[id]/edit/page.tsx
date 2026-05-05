@@ -319,7 +319,7 @@ export default function EditBannerPage({ params }: { params: Promise<{ id: strin
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Alt Text</label>
             <input type="text" value={slotData.alt} onChange={e => updateSlot({ alt: e.target.value })} className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-blue-500 outline-none" />
@@ -340,7 +340,7 @@ export default function EditBannerPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {slotData.linkType === 'category' && (
-          <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
             <select value={slotData.linkData.main} onChange={e => updateLink({ main: e.target.value, sub: "", subSub: "" })} className="border rounded px-2 py-1 text-sm outline-none">
               <option value="">Main Category...</option>
               {mainCategories.map((c: string) => <option key={c} value={c}>{c}</option>)}
@@ -534,7 +534,7 @@ export default function EditBannerPage({ params }: { params: Promise<{ id: strin
         {renderSlotConfig('a')}
         {formData.type === 'double' && renderSlotConfig('b')}
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-end z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex flex-wrap justify-end z-50 gap-3">
           <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded flex items-center gap-2 hover:bg-blue-700">
             <Save size={16} /> Save Banner
           </button>

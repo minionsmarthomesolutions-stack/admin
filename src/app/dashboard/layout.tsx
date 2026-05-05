@@ -7,11 +7,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Dynamic Sidebar */}
       <Sidebar />
       
-      {/* Main Content Content */}
-      <main className="flex-1 flex flex-col w-full">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col w-full min-w-0">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 hidden">
         </header>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto pt-12 md:pt-0">
           {children}
         </div>
       </main>
