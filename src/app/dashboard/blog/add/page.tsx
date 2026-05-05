@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Save, ArrowLeft, Image as ImageIcon, Link as LinkIcon, Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Quote, Undo, Redo } from "lucide-react";
+import CategorySelector from "@/components/ui/CategorySelector";
 
 export default function AddBlogPage() {
   const router = useRouter();
@@ -21,6 +22,9 @@ export default function AddBlogPage() {
   });
 
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
+  const [selectedMain, setSelectedMain] = useState("");
+  const [selectedCat, setSelectedCat] = useState("");
+  const [selectedSub, setSelectedSub] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +72,13 @@ export default function AddBlogPage() {
     
     // Ensure we have the latest content from the editor
     const finalContent = editorRef.current?.innerHTML || "";
-    const submitData = { ...formData, content: finalContent };
+    const submitData = {
+      ...formData,
+      content: finalContent,
+      mainCategory: selectedMain,
+      category: selectedCat || formData.category,
+      subcategory: selectedSub,
+    };
 
     try {
       const res = await fetch("/api/blogs", {
@@ -138,33 +148,23 @@ export default function AddBlogPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              {/* Category + Author row */}
+              <div className="flex flex-col gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Category *</label>
-                  <select 
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    required
-                    className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 bg-white cursor-pointer"
-                  >
-                    <option value="">Select Category</option>
-                    <option value="Smart Home">Smart Home</option>
-                    <option value="Automation">Automation</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Tips & Tricks">Tips & Tricks</option>
-                    <option value="News">News</option>
-                    <option value="Reviews">Reviews</option>
-                    <option value="Tutorials">Tutorials</option>
-                    {categoriesData.map(cat => (
-                      <optgroup key={cat.id} label={cat.id}>
-                        <option value={cat.id}>{cat.id}</option>
-                        {Object.keys(cat.document?.subcategories || {}).map(sub => (
-                          <option key={sub} value={`${cat.id} > ${sub}`}>-- {sub}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <CategorySelector
+                    categoriesData={categoriesData}
+                    selectedMain={selectedMain}
+                    selectedCat={selectedCat}
+                    selectedSub={selectedSub}
+                    onSelect={(main, cat, sub) => {
+                      setSelectedMain(main);
+                      setSelectedCat(cat);
+                      setSelectedSub(sub);
+                      setFormData(p => ({ ...p, category: cat || main }));
+                    }}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Author *</label>
@@ -176,6 +176,7 @@ export default function AddBlogPage() {
                   />
                 </div>
               </div>
+
 
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">Tags</label>
