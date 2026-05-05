@@ -78,16 +78,8 @@ export default function Sidebar() {
             href="/dashboard/banners"
             className={`flex items-center gap-4 py-3 text-[15px] transition ${isSidebarOpen ? 'px-10' : 'justify-center px-0'} ${isActive('/dashboard/banners') ? 'text-[#f59e0b]' : 'text-[#1e293b] hover:bg-gray-100'}`}
           >
-            <Layers size={18} fill={isActive('/dashboard/banners') ? '#f59e0b' : '#334155'} strokeWidth={1} className={`min-w-[18px] ${isActive('/dashboard/banners') ? 'text-[#f59e0b]' : 'text-white'}`} />
-            <span className={`transition-opacity duration-300 whitespace-nowrap ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden w-0'}`}>Manage-Banner</span>
-          </Link>
-
-          <Link
-            href="/dashboard/banners/add"
-            className={`flex items-center gap-4 py-3 text-[15px] transition ${isSidebarOpen ? 'px-10' : 'justify-center px-0'} ${isActive('/dashboard/banners/add') ? 'text-[#fbbf24] font-medium' : 'text-[#1e293b] hover:bg-gray-100'}`}
-          >
-            <ImageIcon size={18} fill={isActive('/dashboard/banners/add') ? '#fbbf24' : 'transparent'} strokeWidth={2} className={`min-w-[18px] ${isActive('/dashboard/banners/add') ? 'text-[#fbbf24]' : 'text-[#334155]'}`} />
-            <span className={`transition-opacity duration-300 whitespace-nowrap ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden w-0'}`}>Add-Banner</span>
+            <Layers size={18} fill={isActive('/dashboard/banners') ? '#f59e0b' : '#334155'} strokeWidth={1} className={`min-w-[18px] ${isActive('/dashboard/banners') ? 'text-[#f59e0b]' : 'text-gray-400'}`} />
+            <span className={`transition-opacity duration-300 whitespace-nowrap ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden w-0'}`}>Banners</span>
           </Link>
         </div>
 
