@@ -273,16 +273,16 @@ export default function CategoriesPage() {
                         return (
                           <div key={subName} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                             <div
-                              className="flex items-center gap-3 px-4 py-2.5 bg-gray-100 cursor-pointer select-none"
+                              className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-200 cursor-pointer select-none hover:bg-gray-50 transition"
                               onClick={() => toggleSub(subKey)}
                             >
-                              {isSubOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                              {isSubOpen ? <ChevronDown size={14} className="text-gray-700" /> : <ChevronRight size={14} className="text-gray-700" />}
                               {subData.logo ? (
                                 <img src={subData.logo} alt="" className="w-5 h-5 rounded object-cover" />
                               ) : (
                                 <div className="w-5 h-5 rounded bg-gray-200 flex items-center justify-center text-xs">🔧</div>
                               )}
-                              <span className="font-medium text-sm flex-1">{subName}</span>
+                              <span className="font-semibold text-sm flex-1 text-gray-900">{subName}</span>
                               <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
                                 Parent: {mainDoc.code?.split(/\d/)[0]}
                               </span>
@@ -322,7 +322,7 @@ export default function CategoriesPage() {
                                     ) : (
                                       <div className="w-5 h-5 rounded bg-gray-100 flex items-center justify-center text-xs">📦</div>
                                     )}
-                                    <span className="text-sm flex-1">{item}</span>
+                                    <span className="text-sm flex-1 font-medium text-gray-900">{item}</span>
                                     <div className="flex gap-1.5">
                                       <button
                                         onClick={() => openModal({
