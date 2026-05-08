@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Home, ChevronRight } from "lucide-react";
 import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
 
 /* ─────────────────────────── types ─────────────────────────── */
@@ -52,6 +52,8 @@ export default function AddProductPage() {
     }).catch(console.error);
   }, []);
 
+  /* Draft hooks moved down below state declarations */
+
   /* global basics */
   const [productName, setProductName]   = useState("");
   const [gstRate, setGstRate]           = useState("18");
@@ -89,6 +91,92 @@ export default function AddProductPage() {
 
   const [isSaving, setIsSaving] = useState(false);
 
+  /* Draft auto-save */
+  const DRAFT_KEY = 'minion-add-product-draft-tsx-v1';
+  
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
+  const getDraftPayload = useCallback(() => ({
+    productName, gstRate, hsnCode, vendor, brandName, stockStatus, quantity, estDelivery, freeShipping,
+    specs, variants, materials, combinations, seoTags, badge, selectedMain, selectedCat, selectedSub,
+    description: descRef.current?.getHTML() ?? null
+  }), [productName, gstRate, hsnCode, vendor, brandName, stockStatus, quantity, estDelivery, freeShipping, specs, variants, materials, combinations, seoTags, badge, selectedMain, selectedCat, selectedSub]);
+
+  const saveDraftToStorage = useCallback((payload: ReturnType<typeof getDraftPayload>) => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ payload, savedAt: new Date().toISOString() }));
+      const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setDraftTime(t);
+      setDraftStatus('saved');
+    } catch {
+      setDraftStatus('unsaved');
+    }
+  }, []);
+
+  const discardDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
+    setDraftStatus('idle');
+  };
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const { payload } = JSON.parse(raw);
+      if (payload.productName !== undefined) setProductName(payload.productName);
+      if (payload.gstRate !== undefined) setGstRate(payload.gstRate);
+      if (payload.hsnCode !== undefined) setHsnCode(payload.hsnCode);
+      if (payload.vendor !== undefined) setVendor(payload.vendor);
+      if (payload.brandName !== undefined) setBrandName(payload.brandName);
+      if (payload.stockStatus !== undefined) setStockStatus(payload.stockStatus);
+      if (payload.quantity !== undefined) setQuantity(payload.quantity);
+      if (payload.estDelivery !== undefined) setEstDelivery(payload.estDelivery);
+      if (payload.freeShipping !== undefined) setFreeShipping(payload.freeShipping);
+      if (payload.specs !== undefined) setSpecs(payload.specs);
+      if (payload.variants !== undefined) setVariants(payload.variants);
+      if (payload.materials !== undefined) setMaterials(payload.materials);
+      if (payload.combinations !== undefined) setCombinations(payload.combinations);
+      if (payload.seoTags !== undefined) setSeoTags(payload.seoTags);
+      if (payload.badge !== undefined) setBadge(payload.badge);
+      if (payload.selectedMain !== undefined) setSelectedMain(payload.selectedMain);
+      if (payload.selectedCat !== undefined) setSelectedCat(payload.selectedCat);
+      if (payload.selectedSub !== undefined) setSelectedSub(payload.selectedSub);
+      if (payload.description !== undefined && descRef.current) {
+        setTimeout(() => descRef.current?.setHTML(payload.description), 500);
+      }
+      setHasDraft(false);
+      setDraftStatus('saved');
+    } catch {
+      setHasDraft(false);
+    }
+  };
+
+  useEffect(() => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      try {
+        const { savedAt } = JSON.parse(raw);
+        const t = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setDraftTime(t);
+        setHasDraft(true);
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setDraftStatus('saving');
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const payload = getDraftPayload();
+    autoSaveTimerRef.current = setTimeout(() => saveDraftToStorage(payload), 5000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [productName, gstRate, hsnCode, vendor, brandName, stockStatus, quantity, estDelivery, freeShipping, specs, variants, materials, combinations, seoTags, badge, selectedMain, selectedCat, selectedSub, getDraftPayload, saveDraftToStorage]);
+
   /* ── category helpers ── */
   const toggleCat = (name: string) =>
     setOpenCats(p => p.includes(name) ? p.filter(x => x !== name) : [...p, name]);
@@ -112,20 +200,21 @@ export default function AddProductPage() {
   const updateVariant = (id: number, k: keyof ColorVariant, v: any) =>
     setVariants(p => p.map(v2 => v2.id === id ? { ...v2, [k]: v } : v2));
 
-  const handlePrimaryImg = (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handlePrimaryImg = (id: number, e: React.ChangeEvent<HTMLInputElement> | File) => {
+    const file = e && 'target' in e ? e.target.files?.[0] : e as File;
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => updateVariant(id, "primaryImage", reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  const handleThumbImg = (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const handleThumbImg = (id: number, e: React.ChangeEvent<HTMLInputElement> | File[]) => {
+    const files = e && 'target' in e ? Array.from(e.target.files || []) : e as File[];
     files.forEach(file => {
       const reader = new FileReader();
-      reader.onloadend = () =>
-        updateVariant(id, "thumbnails", [...(variants.find(v => v.id === id)?.thumbnails ?? []), reader.result as string]);
+      reader.onloadend = () => {
+        setVariants(p => p.map(v2 => v2.id === id ? { ...v2, thumbnails: [...v2.thumbnails, reader.result as string] } : v2));
+      };
       reader.readAsDataURL(file);
     });
   };
@@ -155,7 +244,7 @@ export default function AddProductPage() {
     setMaterials(p => p.map(m => m.id === id ? { ...m, [k]: v } : m));
 
   /* ── submit ── */
-  const handleSubmit = async () => {
+  const handleSubmit = async (submitStatus: 'draft' | 'active' = 'active') => {
     if (!productName.trim()) { alert("Product name is required"); return; }
     if (!variants[0]?.discountPrice) { alert("Discount price is required for the first variant"); return; }
     setIsSaving(true);
@@ -164,7 +253,7 @@ export default function AddProductPage() {
       const body = {
         name: productName,
         productGroupId: null,
-        status: "active",
+        status: submitStatus,
         stockStatus: stockStatus.replace("-","_"),
         quantity: Number(quantity) || 0,
         currentPrice: Number(firstVariant.discountPrice),
@@ -188,7 +277,7 @@ export default function AddProductPage() {
         features: firstVariant.seoTags.split(",").map(t => t.trim()).filter(Boolean),
         specifications: specs.filter(s => s.name || s.value),
         warranty: null,
-        isActive: true,
+        isActive: submitStatus === 'active',
         description: descRef.current?.getHTML() ?? null,
       };
       const res = await fetch("/api/products", {
@@ -196,6 +285,8 @@ export default function AddProductPage() {
         body: JSON.stringify(body),
       });
       if (res.ok) {
+        localStorage.removeItem(DRAFT_KEY);
+        alert(`Product ${submitStatus === 'draft' ? 'saved as draft' : 'published'} successfully!`);
         router.push("/dashboard/products"); router.refresh();
       } else {
         alert("Failed to save product.");
@@ -231,90 +322,150 @@ export default function AddProductPage() {
       {/* ── Main content wrapper: use padding + max-width + responsive padding ── */}
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 120px" }}>
 
-        {/* ── Category Selection ── */}
-        <div style={fgStyle}>
-          <label style={labelStyle}>Category Selection *</label>
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-            {categoriesData.length === 0 ? <div style={{ fontSize: 13, color: '#666' }}>Loading categories...</div> : categoriesData.map((catObj) => {
-              const main = catObj.id;
-              const subcategoriesObj = catObj.document?.subcategories || {};
-              const subs = Object.keys(subcategoriesObj);
-              
-              return (
-                <div key={main} style={{ border: "1px solid #e5e7eb", borderRadius: 4, overflow: "hidden" }}>
-                  {/* accordion header */}
-                  <div
-                    onClick={() => toggleCat(main)}
-                    style={{
-                      background: selectedMain === main ? "#555" : "#666",
-                      color: "#fff", padding: "10px 16px", display: "flex",
-                      alignItems: "center", gap: 10, cursor: "pointer",
-                      fontWeight: 600, fontSize: 13,
-                    }}
-                  >
-                    <span style={{ fontSize: 10, transition: "transform .2s", transform: openCats.includes(main) ? "rotate(90deg)" : "none" }}>▶</span>
-                    {main}
-                  </div>
-                  {/* subs */}
-                  {openCats.includes(main) && (
-                    <div style={{ padding: "10px 16px", background: "#f9fafb", display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {subs.map(sub => (
+        {/* ── Draft Restore Bar ── */}
+        {hasDraft && (
+          <div className="mb-4 flex items-center justify-between gap-4 bg-yellow-50 border border-yellow-300 rounded-xl px-5 py-3 shadow-sm flex-wrap">
+            <div className="flex items-center gap-2 text-yellow-800 text-sm font-medium flex-1">
+              Unsaved draft found from {draftTime}. Restore it to continue where you left off.
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={restoreDraft}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition">
+                Restore Draft
+              </button>
+              <button type="button" onClick={discardDraft}
+                className="bg-transparent border border-gray-300 text-gray-600 hover:border-red-300 hover:text-red-600 text-sm px-4 py-1.5 rounded-lg transition">
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Category Selection – 3-step column picker ─────────────────── */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-bold text-gray-800">Category Selection *</label>
+            {/* breadcrumb pill */}
+            {selectedMain && (
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <span className="bg-yellow-100 text-yellow-800 border border-yellow-300 px-2.5 py-1 rounded-full">{selectedMain}</span>
+                {selectedCat && <><span className="text-gray-400">›</span><span className="bg-blue-100 text-blue-800 border border-blue-300 px-2.5 py-1 rounded-full">{selectedCat}</span></>}
+                {selectedSub && <><span className="text-gray-400">›</span><span className="bg-green-100 text-green-800 border border-green-300 px-2.5 py-1 rounded-full">{selectedSub}</span></>}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+
+            {/* ── Step 1: Main Categories ── */}
+            <div className="border-r border-gray-200">
+              <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-yellow-400 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Main Category</span>
+              </div>
+              <div className="overflow-y-auto max-h-64">
+                {categoriesData.length === 0 ? (
+                  <div className="p-4 text-sm text-gray-400 text-center animate-pulse">Loading…</div>
+                ) : categoriesData.map((catObj) => {
+                  const main = catObj.id;
+                  const isSelected = selectedMain === main;
+                  return (
+                    <button
+                      key={main} type="button"
+                      onClick={() => { toggleCat(main); setSelectedMain(main); setSelectedCat(""); setSelectedSub(""); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-left transition-all border-b border-gray-100 last:border-0
+                        ${isSelected ? 'bg-yellow-50 text-yellow-900 border-l-4 border-l-yellow-400' : 'text-gray-700 hover:bg-gray-50 border-l-4 border-l-transparent'}`}
+                    >
+                      <Home size={14} className={isSelected ? "text-yellow-500" : "text-gray-400"} />
+                      <span className="flex-1 leading-tight">{main}</span>
+                      {isSelected && <ChevronRight size={14} className="text-yellow-500 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Step 2: Subcategories ── */}
+            <div className="border-r border-gray-200">
+              <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
+                <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center transition-colors ${selectedMain ? 'bg-blue-400 text-white' : 'bg-gray-200 text-gray-400'}`}>2</span>
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Subcategory</span>
+              </div>
+              <div className="overflow-y-auto max-h-64 p-3">
+                {!selectedMain ? (
+                  <div className="h-full flex items-center justify-center text-xs text-gray-400 py-10 text-center">← Pick a main<br/>category first</div>
+                ) : (() => {
+                  const catObj = categoriesData.find(c => c.id === selectedMain);
+                  const subcategoriesObj = catObj?.document?.subcategories || {};
+                  const subs = Object.keys(subcategoriesObj);
+                  return subs.length === 0 ? (
+                    <div className="text-xs text-gray-400 py-10 text-center">No subcategories</div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {subs.map(sub => {
+                        const isSelected = selectedCat === sub;
+                        return (
                           <button
                             key={sub} type="button"
-                            onClick={() => { setSelectedMain(main); setSelectedCat(sub); setSelectedSub(""); }}
-                            style={{
-                              padding: "4px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer",
-                              border: selectedCat === sub && selectedMain === main ? "2px solid #ffc000" : "1px solid #d1d5db",
-                              background: selectedCat === sub && selectedMain === main ? "#fff9e6" : "#fff",
-                              fontWeight: selectedCat === sub && selectedMain === main ? 700 : 400,
-                              color: selectedCat === sub && selectedMain === main ? "#b45309" : "#374151",
-                            }}
-                          >{sub}</button>
-                        ))}
-                      </div>
-                      
-                      {/* Third level items if a sub is selected */}
-                      {selectedMain === main && selectedCat && subcategoriesObj[selectedCat]?.items && (
-                        <div style={{ marginTop: 8, padding: 12, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 4 }}>
-                          <label style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 6, display: "block" }}>Select Item / Subcategory:</label>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {subcategoriesObj[selectedCat].items.map((item: string) => (
-                              <button
-                                key={item} type="button"
-                                onClick={() => setSelectedSub(item)}
-                                style={{
-                                  padding: "3px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer",
-                                  border: selectedSub === item ? "1px solid #10b981" : "1px solid #d1d5db",
-                                  background: selectedSub === item ? "#d1fae5" : "#f3f4f6",
-                                  fontWeight: selectedSub === item ? 600 : 400,
-                                  color: selectedSub === item ? "#047857" : "#4b5563",
-                                }}
-                              >{item}</button>
-                            ))}
-                          </div>
+                            onClick={() => { setSelectedCat(sub); setSelectedSub(""); }}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all
+                              ${isSelected ? 'bg-blue-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'}`}
+                          >
+                            {sub}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* ── Step 3: Items / Custom ── */}
+            <div>
+              <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
+                <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center transition-colors ${selectedCat ? 'bg-green-400 text-white' : 'bg-gray-200 text-gray-400'}`}>3</span>
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Item / Tag</span>
+              </div>
+              <div className="overflow-y-auto max-h-64 p-3">
+                {!selectedCat ? (
+                  <div className="h-full flex items-center justify-center text-xs text-gray-400 py-10 text-center">← Pick a<br/>subcategory first</div>
+                ) : (() => {
+                  const catObj = categoriesData.find(c => c.id === selectedMain);
+                  const subcategoriesObj = catObj?.document?.subcategories || {};
+                  const items: string[] = subcategoriesObj[selectedCat]?.items || [];
+                  return (
+                    <div className="flex flex-col gap-2">
+                      {items.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {items.map(item => (
+                            <button
+                              key={item} type="button"
+                              onClick={() => setSelectedSub(item)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all
+                                ${selectedSub === item ? 'bg-green-500 text-white border-green-500 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:border-green-400 hover:bg-green-50'}`}
+                            >
+                              {item}
+                            </button>
+                          ))}
                         </div>
                       )}
-                      
-                      <div style={{ marginTop: 8 }}>
+                      <div className="border-t border-gray-100 pt-2">
+                        <p className="text-[10px] text-gray-400 uppercase font-semibold mb-1.5">Or type custom</p>
                         <input
-                          type="text" placeholder="Other (type custom subcategory)"
-                          value={selectedMain === main ? selectedSub : ""}
-                          onChange={e => { setSelectedMain(main); setSelectedSub(e.target.value); }}
-                          style={{ ...inputStyle, width: 220, padding: "4px 8px", fontSize: 12 }}
+                          type="text"
+                          placeholder="Custom item / tag…"
+                          value={selectedSub}
+                          onChange={e => setSelectedSub(e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-green-400 focus:ring-1 focus:ring-green-100 transition bg-white text-gray-800"
                         />
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })()}
+              </div>
+            </div>
           </div>
-          {selectedMain && (
-            <p style={{ marginTop: 8, fontSize: 12, color: "#059669" }}>
-              ✓ Selected: <strong>{selectedMain}</strong> {selectedCat && `› ${selectedCat}`} {selectedSub ? `› ${selectedSub}` : ""}
-            </p>
-          )}
         </div>
 
         {/* ── Product Basics + Right Panel ── */}
@@ -505,16 +656,19 @@ export default function AddProductPage() {
                 onRemove={() => removeMaterial(m.id)}
                 onUpdate={(k, val) => updateMaterial(m.id, k, val)}
                 onPrimaryImg={(e) => {
-                  const file = e.target.files?.[0]; if (!file) return;
+                  const file = e && 'target' in e ? (e as React.ChangeEvent<HTMLInputElement>).target.files?.[0] : e as File;
+                  if (!file) return;
                   const reader = new FileReader();
                   reader.onloadend = () => updateMaterial(m.id, "primaryImage", reader.result as string);
                   reader.readAsDataURL(file);
                 }}
                 onThumbImg={(e) => {
-                  const files = Array.from(e.target.files || []);
+                  const files = e && 'target' in e ? Array.from((e as React.ChangeEvent<HTMLInputElement>).target.files || []) : e as File[];
                   files.forEach(file => {
                     const reader = new FileReader();
-                    reader.onloadend = () => updateMaterial(m.id, "thumbnails", [...m.thumbnails, reader.result as string]);
+                    reader.onloadend = () => {
+                      setMaterials(p => p.map(m2 => m2.id === m.id ? { ...m2, thumbnails: [...m2.thumbnails, reader.result as string] } : m2));
+                    };
                     reader.readAsDataURL(file);
                   });
                 }}
@@ -596,19 +750,47 @@ export default function AddProductPage() {
       </main>
 
       {/* ── Sticky Submit Bar ── */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "flex-end", gap: 12, zIndex: 50, boxShadow: "0 -4px 16px rgba(0,0,0,.06)", flexWrap: "wrap" }}>
-        <Link href="/dashboard/products"
-          style={{ padding: "8px 20px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, color: "#374151", textDecoration: "none", display: "flex", alignItems: "center" }}>
-          Cancel
-        </Link>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSaving}
-          style={{ background: "#ffc000", color: "#fff", border: "none", padding: "8px 24px", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8, opacity: isSaving ? 0.7 : 1 }}
-        >
-          {isSaving ? "Saving…" : <>+ Add Products</>}
-        </button>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, zIndex: 50, boxShadow: "0 -4px 16px rgba(0,0,0,.06)", flexWrap: "wrap" }}>
+        
+        {/* Draft status badge */}
+        <div className={`flex items-center gap-2 text-xs font-medium ${
+          draftStatus === 'saving'  ? 'text-amber-500' :
+          draftStatus === 'saved'   ? 'text-emerald-600' :
+          draftStatus === 'unsaved' ? 'text-red-500' : 'text-gray-400'
+        }`}>
+          <span className={`w-2 h-2 rounded-full inline-block ${
+            draftStatus === 'saving'  ? 'bg-amber-400 animate-pulse' :
+            draftStatus === 'saved'   ? 'bg-emerald-500' :
+            draftStatus === 'unsaved' ? 'bg-red-400' : 'bg-gray-300'
+          }`} />
+          {draftStatus === 'saving'  ? 'Auto-saving…' :
+           draftStatus === 'saved'   ? `Draft saved${draftTime ? ' at ' + draftTime : ''}` :
+           draftStatus === 'unsaved' ? 'Failed to save draft' :
+           'No changes'}
+        </div>
+
+        <div style={{ display: "flex", gap: 12 }}>
+          <Link href="/dashboard/products"
+            style={{ padding: "8px 20px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, color: "#374151", textDecoration: "none", display: "flex", alignItems: "center" }}>
+            Cancel
+          </Link>
+          <button
+            type="button"
+            onClick={() => handleSubmit('draft')}
+            disabled={isSaving}
+            style={{ background: "#fff", color: "#374151", border: "1px solid #ffc000", padding: "8px 24px", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8, opacity: isSaving ? 0.7 : 1 }}
+          >
+            Save Draft
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit('active')}
+            disabled={isSaving}
+            style={{ background: "#ffc000", color: "#fff", border: "none", padding: "8px 24px", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: isSaving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8, opacity: isSaving ? 0.7 : 1 }}
+          >
+            {isSaving ? "Saving…" : <>+ Publish Product</>}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -620,8 +802,8 @@ interface CVCProps {
   index: number;
   onRemove: () => void;
   onUpdate: (k: keyof ColorVariant, v: any) => void;
-  onPrimaryImg: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onThumbImg: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onPrimaryImg: (e: React.ChangeEvent<HTMLInputElement> | File) => void;
+  onThumbImg: (e: React.ChangeEvent<HTMLInputElement> | File[]) => void;
   onRemoveThumb: (ti: number) => void;
   onMoveThumb: (ti: number, dir: number) => void;
   onAddDetail: () => void;
@@ -642,6 +824,22 @@ function ColorVariantCard({
   const [previewSrc, setPreviewSrc]       = useState("");
   const [hoveredPrimary, setHoveredPrimary] = useState(false);
   const [hoveredThumb, setHoveredThumb]   = useState<number | null>(null);
+  const [dragOverPrimary, setDragOverPrimary] = useState(false);
+  const [dragOverThumbs, setDragOverThumbs] = useState(false);
+
+  const handlePrimaryDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverPrimary(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) onPrimaryImg(file);
+  };
+
+  const handleThumbsDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverThumbs(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) onThumbImg(files);
+  };
 
   /* icon button shared style */
   const iconBtn = (bg: string): React.CSSProperties => ({
@@ -711,14 +909,18 @@ function ColorVariantCard({
             <div
               onMouseEnter={() => setHoveredPrimary(true)}
               onMouseLeave={() => setHoveredPrimary(false)}
+              onDragOver={(e) => { e.preventDefault(); setDragOverPrimary(true); }}
+              onDragLeave={() => setDragOverPrimary(false)}
+              onDrop={handlePrimaryDrop}
               onClick={() => !variant.primaryImage && primaryRef.current?.click()}
               style={{
-                border: "2px dashed #ffc000", borderRadius: 6,
+                border: dragOverPrimary ? "2px dashed #3b82f6" : "2px dashed #ffc000", borderRadius: 6,
                 width: 180, height: 180, display: "flex",
                 alignItems: "center", justifyContent: "center",
                 cursor: variant.primaryImage ? "default" : "pointer",
-                background: "#fffdf0", overflow: "hidden",
+                background: dragOverPrimary ? "#eff6ff" : "#fffdf0", overflow: "hidden",
                 position: "relative", marginBottom: 12,
+                transition: "all 0.2s ease"
               }}
               className="color-photo-preview primary-image-preview"
             >
@@ -759,7 +961,10 @@ function ColorVariantCard({
             <div className="color-thumbnails-section">
               <label style={labelStyle}>Additional Product Images *</label>
               <div id={`thumbnails-grid-${index}`} className="thumbnails-grid"
-                style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                onDragOver={(e) => { e.preventDefault(); setDragOverThumbs(true); }}
+                onDragLeave={() => setDragOverThumbs(false)}
+                onDrop={handleThumbsDrop}
+                style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8, padding: dragOverThumbs ? 4 : 0, background: dragOverThumbs ? "#eff6ff" : "transparent", border: dragOverThumbs ? "1px dashed #3b82f6" : "none", borderRadius: 6, transition: "all 0.2s ease" }}>
                 {variant.thumbnails.map((src, ti) => (
                   <div
                     key={ti}
@@ -925,8 +1130,8 @@ interface MCProps {
   index: number;
   onRemove: () => void;
   onUpdate: (k: keyof MaterialVariant, v: any) => void;
-  onPrimaryImg: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onThumbImg: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onPrimaryImg: (e: React.ChangeEvent<HTMLInputElement> | File) => void;
+  onThumbImg: (e: React.ChangeEvent<HTMLInputElement> | File[]) => void;
   onRemoveThumb: (ti: number) => void;
   showRemove: boolean;
   inputStyle: React.CSSProperties;
@@ -939,6 +1144,22 @@ function MaterialCard({
 }: MCProps) {
   const primaryRef = useRef<HTMLInputElement>(null);
   const thumbRef   = useRef<HTMLInputElement>(null);
+  const [dragOverPrimary, setDragOverPrimary] = useState(false);
+  const [dragOverThumbs, setDragOverThumbs] = useState(false);
+
+  const handlePrimaryDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverPrimary(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) onPrimaryImg(file);
+  };
+
+  const handleThumbsDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverThumbs(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) onThumbImg(files);
+  };
 
   return (
     <div className="material-item-enhanced"
@@ -956,11 +1177,15 @@ function MaterialCard({
           {/* preview box */}
           <div
             onClick={() => !material.primaryImage && primaryRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOverPrimary(true); }}
+            onDragLeave={() => setDragOverPrimary(false)}
+            onDrop={handlePrimaryDrop}
             style={{
-              border: `2px dashed ${material.primaryImage ? "#ffc000" : "#ffc000"}`,
+              border: dragOverPrimary ? "2px dashed #3b82f6" : `2px dashed ${material.primaryImage ? "#ffc000" : "#ffc000"}`,
               borderRadius: 6, width: "100%", height: 180, display: "flex",
               alignItems: "center", justifyContent: "center", cursor: material.primaryImage ? "default" : "pointer",
-              background: "#fffdf0", overflow: "hidden", position: "relative", marginBottom: 16,
+              background: dragOverPrimary ? "#eff6ff" : "#fffdf0", overflow: "hidden", position: "relative", marginBottom: 16,
+              transition: "all 0.2s ease"
             }}
           >
             {material.primaryImage
@@ -971,7 +1196,12 @@ function MaterialCard({
 
           {/* thumbnails */}
           <label style={labelStyle}>Material Additional Images *</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+          <div 
+            onDragOver={(e) => { e.preventDefault(); setDragOverThumbs(true); }}
+            onDragLeave={() => setDragOverThumbs(false)}
+            onDrop={handleThumbsDrop}
+            style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8, padding: dragOverThumbs ? 4 : 0, background: dragOverThumbs ? "#eff6ff" : "transparent", border: dragOverThumbs ? "1px dashed #3b82f6" : "none", borderRadius: 6, transition: "all 0.2s ease" }}
+          >
             {material.thumbnails.map((src, ti) => (
               <div key={ti} style={{ width: 64, height: 64, position: "relative", border: "1px solid #e5e7eb", borderRadius: 4, overflow: "hidden" }}>
                 <img src={src} alt={`Thumb ${ti+1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />

@@ -27,7 +27,7 @@ export async function GET() {
   try {
     const { data, error } = await supabase.from('services').select('*');
     if (error) throw error;
-    
+
     console.log('--- SUPABASE RAW ROW 0 ---', data && data[0]);
 
     const services = data.map(d => ({ ...(d.document || {}), id: d.id }));

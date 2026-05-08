@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// ── Supabase Storage upload helper ───────────────────────────────────────────
+async function uploadBase64Image(base64Str: string | null | undefined, folder: string): Promise<string | null> {
+  if (!base64Str || !base64Str.startsWith('data:image')) return base64Str ?? null;
+  try {
+    const matches = base64Str.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const ext = contentType.split('/')[1] || 'webp';
+    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from('products').upload(fileName, buffer, { contentType, upsert: true });
+    if (error) { console.error('Storage upload error:', error); return null; }
+    const { data } = supabase.storage.from('products').getPublicUrl(fileName);
+    return data.publicUrl;
+  } catch (e) {
+    console.error('Base64 upload failed:', e);
+    return null;
+  }
+}
+
 // GET /api/products — list all products ordered by newest
 export async function GET(req: NextRequest) {
   try {
@@ -21,14 +41,14 @@ export async function GET(req: NextRequest) {
     // Apply filtering in memory
     if (search) {
       const s = search.toLowerCase();
-      products = products.filter(p => 
-        p.name?.toLowerCase().includes(s) || 
-        p.category?.toLowerCase().includes(s) || 
-        p.mainCategory?.toLowerCase().includes(s) || 
+      products = products.filter(p =>
+        p.name?.toLowerCase().includes(s) ||
+        p.category?.toLowerCase().includes(s) ||
+        p.mainCategory?.toLowerCase().includes(s) ||
         p.productGroupId?.toLowerCase().includes(s)
       );
     }
-    
+
     if (groupId) {
       products = products.filter(p => p.productGroupId === groupId);
     }
@@ -47,10 +67,20 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/products — create a new product
+// POST /api/products — create a new product (uploads images to Supabase Storage)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // Upload primary image and thumbnails to Supabase Storage
+    const primaryImageUrl = await uploadBase64Image(body.primaryImageUrl || body.imageUrl, 'primary');
+    const thumbnailUrls: string[] = [];
+    if (Array.isArray(body.thumbnailUrls)) {
+      for (const img of body.thumbnailUrls) {
+        const url = await uploadBase64Image(img, 'thumbnails');
+        if (url) thumbnailUrls.push(url);
+      }
+    }
 
     const documentData = {
       name: body.name,
@@ -71,9 +101,9 @@ export async function POST(req: NextRequest) {
       estimatedDelivery: body.estimatedDelivery || null,
       freeShipping: body.freeShipping || false,
       description: body.description || null,
-      primaryImageUrl: body.primaryImageUrl || null,
-      imageUrl: body.imageUrl || null,
-      thumbnailUrls: body.thumbnailUrls || [],
+      primaryImageUrl: primaryImageUrl || null,
+      imageUrl: primaryImageUrl || null,
+      thumbnailUrls: thumbnailUrls.length > 0 ? thumbnailUrls : (body.thumbnailUrls || []),
       colorVariant: body.colorVariant || null,
       materials: body.materials || [],
       services: body.services || [],

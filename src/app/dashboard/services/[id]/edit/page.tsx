@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { 
   Camera, 
   Home, 
@@ -44,6 +44,7 @@ interface ServicePackage {
   included: Feature[];
   notIncluded: Feature[];
   complimentary: Feature[];
+  galleryImages?: (string | null)[];
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -53,7 +54,8 @@ const defaultPackage = (): ServicePackage => ({
   pricePopup: "",
   included: [defaultFeature()],
   notIncluded: [defaultFeature()],
-  complimentary: [defaultFeature()]
+  complimentary: [defaultFeature()],
+  galleryImages: [null, null, null, null, null]
 });
 
 // ── Service Gallery Component ─────────────────────────────────────────────
@@ -161,9 +163,7 @@ const ServiceGallery = ({
   const renderSlot = (slotIndex: number) => {
     const slot = GALLERY_SLOTS[slotIndex];
     const img = images[slotIndex];
-    if (isLoading) return <div className="p-12 text-center text-gray-500 animate-pulse">Loading service data...</div>;
-  if (!isFound) return <div className="p-12 text-center text-red-500 font-bold">Service not found.</div>;
-  
+    
   return (
       <div
         key={slotIndex}
@@ -487,7 +487,6 @@ const PackageSection = ({
   pkgData: ServicePackage;
   updatePkg: (data: ServicePackage) => void;
 }) => {
-  const [pkgGalleryImages, setPkgGalleryImages] = useState<(string | null)[]>([null, null, null, null, null]);
 
   const addFeature = (type: 'included' | 'notIncluded' | 'complimentary') => {
     updatePkg({ ...pkgData, [type]: [...pkgData[type], defaultFeature()] });
@@ -625,8 +624,8 @@ const PackageSection = ({
             Click a slot to upload • select multiple files to fill slots sequentially • drag a filled slot onto another to swap • drop files from your OS directly onto a slot.
           </p>
           <PackageGallery
-            images={pkgGalleryImages}
-            onChange={setPkgGalleryImages}
+            images={pkgData.galleryImages || [null, null, null, null, null]}
+            onChange={(imgs) => updatePkg({ ...pkgData, galleryImages: imgs })}
             isPremium={isPremium}
           />
         </div>
@@ -717,6 +716,9 @@ export default function EditServicePage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) return <div className="p-12 text-center text-gray-500 animate-pulse">Loading service data...</div>;
+  if (!isFound) return <div className="p-12 text-center text-red-500 font-bold">Service not found.</div>;
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto font-sans pb-24">

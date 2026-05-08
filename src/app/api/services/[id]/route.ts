@@ -7,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { data, error } = await supabase.from('services').select('*').eq('id', id).single();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json({ id: data.id, ...(data.document || {}) });
+    return NextResponse.json({ id: data.id || data._id || data.uuid || (data.document && data.document.id), ...(data.document || data) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -45,7 +45,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ id: data.id, ...(data.document || {}) });
+    return NextResponse.json({ id: data.id || data._id || data.uuid || (data.document && data.document.id), ...(data.document || data) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

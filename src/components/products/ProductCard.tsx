@@ -60,9 +60,14 @@ export default function ProductCard({ product, onDelete, onDuplicate }: ProductC
             <Package size={40} className="text-gray-200" />
           </div>
         )}
-        {/* Active/Inactive badge */}
-        <div className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${product.isActive ? "bg-emerald-500 text-white" : "bg-gray-400 text-white"}`}>
-          {product.isActive ? "Active" : "Inactive"}
+        {/* Active/Inactive/Draft badge */}
+        <div className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+          product.status === 'draft' ? "bg-yellow-100 text-yellow-800 border border-yellow-300" :
+          product.isActive ? "bg-emerald-500 text-white" : "bg-gray-400 text-white"
+        }`}>
+          {product.status === 'draft' ? (
+            <div className="flex items-center gap-1"><Tag size={10} /> Draft</div>
+          ) : product.isActive ? "Active" : "Inactive"}
         </div>
       </div>
 

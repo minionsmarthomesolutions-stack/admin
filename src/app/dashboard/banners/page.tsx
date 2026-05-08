@@ -137,6 +137,7 @@ export default function BannersPage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search banners..."
               className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition w-64 bg-gray-50"
+              suppressHydrationWarning
             />
           </div>
         </div>

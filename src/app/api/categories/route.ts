@@ -20,19 +20,6 @@ function generateCode(prefix: string, existingCodes: string[]): string {
   return `${prefix}${next}${fy}`;
 }
 
-async function uploadLogoToSupabase(base64: string, path: string): Promise<string | null> {
-  if (!base64 || !base64.startsWith('data:image')) return base64 || null;
-  const matches = base64.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
-  if (!matches) return null;
-  const contentType = matches[1];
-  const buffer = Buffer.from(matches[2], 'base64');
-  const ext = contentType.split('/')[1] || 'webp';
-  const fileName = `${path}_${Date.now()}.${ext}`;
-  const { data, error } = await supabase.storage.from('categories').upload(fileName, buffer, { contentType, upsert: true });
-  if (error) { console.error('Logo upload error:', error); return null; }
-  return supabase.storage.from('categories').getPublicUrl(fileName).data.publicUrl;
-}
-
 // GET /api/categories
 export async function GET() {
   try {
@@ -49,20 +36,16 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { type, name, prefix, logo, parentMain, subName, parentSub, subSubName } = body;
+    const { type, name, prefix, parentMain, subName, parentSub, subSubName } = body;
 
     if (type === 'main') {
-      // Get existing codes to generate next code
       const { data: existing } = await supabase.from('categories').select('document');
       const codes = (existing || []).map((r: any) => r.document?.code || '');
       const code = generateCode(prefix.toUpperCase(), codes);
 
-      let logoUrl = '';
-      if (logo) logoUrl = (await uploadLogoToSupabase(logo, `main/${name}`)) || '';
-
       const { data, error } = await supabase
         .from('categories')
-        .insert([{ id: name, document: { code, logo: logoUrl, subcategories: {} } }])
+        .insert([{ id: name, document: { code, subcategories: {} } }])
         .select().single();
 
       if (error) throw error;
@@ -75,11 +58,7 @@ export async function POST(req: Request) {
 
       const doc = parent.document || {};
       doc.subcategories = doc.subcategories || {};
-
-      let logoUrl = '';
-      if (logo) logoUrl = (await uploadLogoToSupabase(logo, `sub/${parentMain}/${subName}`)) || '';
-
-      doc.subcategories[subName] = { logo: logoUrl, items: [], itemLogos: {} };
+      doc.subcategories[subName] = { items: [] };
 
       const { error } = await supabase.from('categories').update({ document: doc }).eq('id', parentMain);
       if (error) throw error;
@@ -96,11 +75,6 @@ export async function POST(req: Request) {
 
       sub.items = sub.items || [];
       if (!sub.items.includes(subSubName)) sub.items.push(subSubName);
-
-      let logoUrl = '';
-      if (logo) logoUrl = (await uploadLogoToSupabase(logo, `subsub/${parentMain}/${parentSub}/${subSubName}`)) || '';
-      sub.itemLogos = sub.itemLogos || {};
-      if (logoUrl) sub.itemLogos[subSubName] = logoUrl;
 
       const { error } = await supabase.from('categories').update({ document: doc }).eq('id', parentMain);
       if (error) throw error;
@@ -141,7 +115,6 @@ export async function DELETE(req: Request) {
         const subCat = doc.subcategories?.[sub];
         if (subCat) {
           subCat.items = (subCat.items || []).filter((i: string) => i !== subsub);
-          if (subCat.itemLogos) delete subCat.itemLogos[subsub];
         }
       }
 
@@ -160,13 +133,12 @@ export async function DELETE(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { type, oldName, newName, parentMain, parentSub, logo, prefix } = body;
+    const { type, oldName, newName, parentMain, parentSub, prefix } = body;
 
     if (type === 'main') {
       const { data: parent } = await supabase.from('categories').select('*').eq('id', oldName).single();
       if (!parent) return NextResponse.json({ error: 'Not found' }, { status: 404 });
       const doc = parent.document || {};
-      if (logo) doc.logo = (await uploadLogoToSupabase(logo, `main/${newName}`)) || doc.logo;
       if (newName !== oldName) {
         await supabase.from('categories').delete().eq('id', oldName);
         await supabase.from('categories').insert([{ id: newName, document: doc }]);
@@ -179,12 +151,9 @@ export async function PUT(req: Request) {
       const doc = parent.document || {};
       const subData = doc.subcategories?.[oldName];
       if (!subData) return NextResponse.json({ error: 'Sub not found' }, { status: 404 });
-      if (logo) subData.logo = (await uploadLogoToSupabase(logo, `sub/${parentMain}/${newName}`)) || subData.logo;
       if (newName !== oldName) {
         delete doc.subcategories[oldName];
         doc.subcategories[newName] = subData;
-      } else {
-        doc.subcategories[oldName] = subData;
       }
       await supabase.from('categories').update({ document: doc }).eq('id', parentMain);
     } else if (type === 'subsub') {
@@ -194,10 +163,6 @@ export async function PUT(req: Request) {
       const subCat = doc.subcategories?.[parentSub];
       if (!subCat) return NextResponse.json({ error: 'Sub not found' }, { status: 404 });
       subCat.items = (subCat.items || []).map((i: string) => i === oldName ? newName : i);
-      if (logo) {
-        const url = await uploadLogoToSupabase(logo, `subsub/${parentMain}/${parentSub}/${newName}`);
-        if (url) { subCat.itemLogos = subCat.itemLogos || {}; subCat.itemLogos[newName] = url; }
-      }
       await supabase.from('categories').update({ document: doc }).eq('id', parentMain);
     }
 

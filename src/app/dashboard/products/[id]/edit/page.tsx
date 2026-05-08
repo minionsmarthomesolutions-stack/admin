@@ -94,7 +94,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const removeArr = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, idx: number) =>
     setter((prev) => prev.filter((_, i) => i !== idx));
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = async (submitStatus?: 'draft' | 'active', e?: React.FormEvent) => {
     e?.preventDefault();
     if (!form) return;
     setIsSaving(true);
@@ -109,6 +109,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         services: services.filter(Boolean),
         features: features.filter(Boolean),
         specifications: specifications.filter((s) => s.name || s.value),
+        ...(submitStatus ? { status: submitStatus, isActive: submitStatus === 'active' } : {})
       };
       const res = await fetch(`/api/products/${resolvedParams.id}`, {
         method: "PUT",
@@ -156,7 +157,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         <Link href="/dashboard/products" className="text-sm text-gray-500 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition">Cancel</Link>
       </header>
 
-      <form onSubmit={handleSubmit} className="max-w-5xl mx-auto px-4 pt-8">
+      <form onSubmit={(e) => handleSubmit(undefined, e)} className="max-w-5xl mx-auto px-4 pt-8">
 
         {/* Basic Information */}
         <div className={card}>
@@ -456,9 +457,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
       {/* Fixed Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 py-4 flex flex-wrap justify-end gap-3 z-50">
         <Link href="/dashboard/products" className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition">Cancel</Link>
-        <button onClick={() => handleSubmit()} disabled={isSaving}
+        <button onClick={() => handleSubmit('draft')} disabled={isSaving}
+          className="px-8 py-2.5 rounded-xl border border-[#ffc800] text-gray-700 text-sm font-bold hover:bg-yellow-50 transition shadow-sm disabled:opacity-60 flex items-center gap-2">
+          Save Draft
+        </button>
+        <button onClick={() => handleSubmit(form.status === 'draft' ? 'active' : undefined)} disabled={isSaving}
           className="px-8 py-2.5 rounded-xl bg-[#ffc800] text-white text-sm font-bold hover:bg-yellow-500 transition shadow-sm disabled:opacity-60 flex items-center gap-2">
-          {isSaving ? (<><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving…</>) : (<><Save size={16} />Update Product</>)}
+          {isSaving ? (<><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving…</>) : (<><Save size={16} />{form.status === 'draft' ? 'Publish Product' : 'Update Product'}</>)}
         </button>
       </div>
     </div>

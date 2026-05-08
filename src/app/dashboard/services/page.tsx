@@ -109,9 +109,9 @@ export default function ServicesPage() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
-          { label: "Total Services",  value: stats.total,      color: "text-[#ffc800]",   icon: <BarChart2 size={20} /> },
-          { label: "Active Services", value: stats.active,     color: "text-emerald-500", icon: <CheckCircle size={20} /> },
-          { label: "Categories",      value: stats.categories, color: "text-blue-500",    icon: <Tag size={20} /> },
+          { label: "Total Services", value: stats.total, color: "text-[#ffc800]", icon: <BarChart2 size={20} /> },
+          { label: "Active Services", value: stats.active, color: "text-emerald-500", icon: <CheckCircle size={20} /> },
+          { label: "Categories", value: stats.categories, color: "text-blue-500", icon: <Tag size={20} /> },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col items-center text-center">
             <span className={`${s.color} mb-2`}>{s.icon}</span>
@@ -133,6 +133,7 @@ export default function ServicesPage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search services..."
               className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition w-full bg-gray-50"
+              suppressHydrationWarning
             />
           </div>
         </div>

@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ArrowLeft, Image as ImageIcon } from "lucide-react";
-import CategorySelector from "@/components/ui/CategorySelector";
+import { Save, ArrowLeft, Image as ImageIcon, AlertTriangle, Home, ChevronRight } from "lucide-react";
 import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
+
+const BLOG_DRAFT_KEY = "blog_add_form_draft";
 
 export default function AddBlogPage() {
   const router = useRouter();
+
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
@@ -17,61 +19,114 @@ export default function AddBlogPage() {
     tags: "",
     primaryImage: "",
     content: "",
-    status: "draft",
     readingTime: 5,
-    metaDescription: ""
+    metaDescription: "",
   });
-
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
   const [selectedMain, setSelectedMain] = useState("");
   const [selectedCat, setSelectedCat] = useState("");
   const [selectedSub, setSelectedSub] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [openCats, setOpenCats] = useState<string[]>([]);
   const editorRef = useRef<RichEditorHandle>(null);
 
-  useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(data => {
-      if (Array.isArray(data)) setCategoriesData(data);
-    }).catch(console.error);
+  const toggleCat = (name: string) =>
+    setOpenCats((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name]));
+
+  // ── Draft states ──────────────────────────────────────────────────────────
+  const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "unsaved">("idle");
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
+  // ── Draft helpers ─────────────────────────────────────────────────────────
+  const getDraftPayload = useCallback(
+    () => ({ formData, selectedMain, selectedCat, selectedSub }),
+    [formData, selectedMain, selectedCat, selectedSub]
+  );
+
+  const saveDraftToStorage = useCallback((payload: ReturnType<typeof getDraftPayload>) => {
+    try {
+      localStorage.setItem(BLOG_DRAFT_KEY, JSON.stringify({ payload, savedAt: new Date().toISOString() }));
+      setDraftTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      setDraftStatus("saved");
+    } catch {
+      setDraftStatus("unsaved");
+    }
   }, []);
 
-  const handleChange = (e: any) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const discardDraft = () => {
+    localStorage.removeItem(BLOG_DRAFT_KEY);
+    setHasDraft(false);
+    setDraftStatus("idle");
+  };
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(BLOG_DRAFT_KEY);
+      if (!raw) return;
+      const { payload } = JSON.parse(raw);
+      if (payload.formData) {
+        setFormData(payload.formData);
+        if (payload.formData.content) {
+          setTimeout(() => editorRef.current?.setHTML(payload.formData.content), 0);
+        }
+      }
+      if (payload.selectedMain !== undefined) setSelectedMain(payload.selectedMain);
+      if (payload.selectedCat !== undefined) setSelectedCat(payload.selectedCat);
+      if (payload.selectedSub !== undefined) setSelectedSub(payload.selectedSub);
+      setHasDraft(false);
+      setDraftStatus("saved");
+    } catch {
+      setHasDraft(false);
+    }
+  };
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    const raw = localStorage.getItem(BLOG_DRAFT_KEY);
+    if (raw) {
+      try {
+        const { savedAt } = JSON.parse(raw);
+        setDraftTime(new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        setHasDraft(true);
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Auto-save 5s after changes
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setDraftStatus("saving");
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const payload = getDraftPayload();
+    autoSaveTimerRef.current = setTimeout(() => saveDraftToStorage(payload), 5000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [getDraftPayload, saveDraftToStorage]);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setCategoriesData(data); })
+      .catch(console.error);
+  }, []);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, primaryImage: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setFormData((prev) => ({ ...prev, primaryImage: reader.result as string }));
+    reader.readAsDataURL(file);
   };
 
-  const removePrimaryImage = () => {
-    setFormData(prev => ({ ...prev, primaryImage: "" }));
-  };
-
-  const execCommand = (command: string, value: string | undefined = undefined) => {
-    document.execCommand(command, false, value);
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
-  };
-
-  const handleContentChange = () => {
-    if (editorRef.current) {
-      setFormData(prev => ({ ...prev, content: editorRef.current!.innerHTML }));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (status: "draft" | "published") => {
     setIsSaving(true);
-    
-    // Ensure we have the latest content from the editor
     const finalContent = editorRef.current?.getHTML() ?? "";
     const submitData = {
       ...formData,
@@ -79,19 +134,18 @@ export default function AddBlogPage() {
       mainCategory: selectedMain,
       category: selectedCat || formData.category,
       subcategory: selectedSub,
+      status,
     };
-
     try {
       const res = await fetch("/api/blogs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),
       });
-
       if (res.ok) {
-        alert("Blog successfully saved!");
-        router.push("/dashboard/blog");
-        router.refresh();
+        if (status === "published") localStorage.removeItem(BLOG_DRAFT_KEY);
+        alert(status === "published" ? "Blog published!" : "Draft saved!");
+        if (status === "published") { router.push("/dashboard/blog"); router.refresh(); }
       } else {
         alert("Failed to save blog.");
       }
@@ -102,27 +156,56 @@ export default function AddBlogPage() {
     setIsSaving(false);
   };
 
+  const draftStatusLabel =
+    draftStatus === "saving"  ? "Auto-saving…" :
+    draftStatus === "saved"   ? `Draft saved${draftTime ? " at " + draftTime : ""}` :
+    draftStatus === "unsaved" ? "Failed to save draft" :
+    "No changes";
+
   return (
-    <div className="min-h-screen bg-[#f5f5f5] pb-24 font-sans text-gray-800">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/blog" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition">
-            <ArrowLeft size={16} /> Back
-          </Link>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-xl font-bold bg-gradient-to-br from-[#ffd700] to-[#ffc000] bg-clip-text text-transparent">Add New Blog</h1>
-        </div>
+    <div className="min-h-screen bg-[#f5f5f5] pb-32 font-sans text-gray-800">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3 shadow-sm">
+        <Link href="/dashboard/blog" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition">
+          <ArrowLeft size={16} /> Back
+        </Link>
+        <span className="text-gray-300">|</span>
+        <h1 className="text-xl font-bold bg-gradient-to-br from-[#ffd700] to-[#ffc000] bg-clip-text text-transparent">
+          Add New Blog
+        </h1>
       </header>
 
       <div className="max-w-4xl mx-auto mt-8 px-4">
         <div className="text-center mb-10 bg-white rounded-lg p-8 shadow-sm">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-br from-[#ffd700] to-[#ffc000] bg-clip-text text-transparent">Add Blog Post</h1>
+          <h2 className="text-4xl font-bold mb-2 bg-gradient-to-br from-[#ffd700] to-[#ffc000] bg-clip-text text-transparent">
+            Add Blog Post
+          </h2>
           <p className="text-lg text-gray-500">Create a new post for your blog</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-8">
-          
-          {/* Basic Information Card */}
+        {/* Draft Restore Bar */}
+        {hasDraft && (
+          <div className="mb-6 flex items-center justify-between gap-4 bg-yellow-50 border border-yellow-300 rounded-xl px-5 py-3 shadow-sm flex-wrap">
+            <div className="flex items-center gap-2 text-yellow-800 text-sm font-medium flex-1">
+              <AlertTriangle size={16} className="text-yellow-500 shrink-0" />
+              Unsaved draft found{draftTime ? ` from ${draftTime}` : ""}. Restore it to continue where you left off.
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={restoreDraft}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition">
+                Restore Draft
+              </button>
+              <button type="button" onClick={discardDraft}
+                className="border border-gray-300 text-gray-600 hover:border-red-300 hover:text-red-600 text-sm px-4 py-1.5 rounded-lg transition">
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit("published"); }} className="flex flex-col gap-8">
+
+          {/* Basic Information */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900 mb-1">Basic Information</h2>
@@ -134,57 +217,145 @@ export default function AddBlogPage() {
                 <input
                   type="text" name="title" value={formData.title} onChange={handleChange} required
                   placeholder="Enter an engaging blog title"
-                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 transition"
+                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/10 transition"
                   maxLength={100}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">Excerpt *</label>
                 <textarea
                   name="excerpt" value={formData.excerpt} onChange={handleChange} required
                   placeholder="Brief description that will appear in blog previews"
-                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 transition min-h-[100px]"
+                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/10 transition min-h-[100px]"
                   maxLength={300}
                 />
               </div>
 
-
-              {/* Category + Author row */}
               <div className="flex flex-col gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Category *</label>
-                  <CategorySelector
-                    categoriesData={categoriesData}
-                    selectedMain={selectedMain}
-                    selectedCat={selectedCat}
-                    selectedSub={selectedSub}
-                    onSelect={(main, cat, sub) => {
-                      setSelectedMain(main);
-                      setSelectedCat(cat);
-                      setSelectedSub(sub);
-                      setFormData(p => ({ ...p, category: cat || main }));
-                    }}
-                  />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-900">Category *</label>
+                    {selectedMain && (
+                      <div className="flex items-center gap-1.5 text-xs font-medium">
+                        <span className="bg-yellow-100 text-yellow-800 border border-yellow-300 px-2.5 py-1 rounded-full">{selectedMain}</span>
+                        {selectedCat && <><span className="text-gray-400">›</span><span className="bg-blue-100 text-blue-800 border border-blue-300 px-2.5 py-1 rounded-full">{selectedCat}</span></>}
+                        {selectedSub && <><span className="text-gray-400">›</span><span className="bg-green-100 text-green-800 border border-green-300 px-2.5 py-1 rounded-full">{selectedSub}</span></>}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    {/* Step 1: Main Category */}
+                    <div className="border-r border-gray-200">
+                      <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-yellow-400 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Main Category</span>
+                      </div>
+                      <div className="overflow-y-auto max-h-56">
+                        {categoriesData.length === 0 ? (
+                          <div className="p-4 text-sm text-gray-400 text-center animate-pulse">Loading…</div>
+                        ) : categoriesData.map((catObj) => {
+                          const main = catObj.id;
+                          const isSelected = selectedMain === main;
+                          return (
+                            <button key={main} type="button"
+                              onClick={() => { toggleCat(main); setSelectedMain(main); setSelectedCat(""); setSelectedSub(""); setFormData((p) => ({ ...p, category: main })); }}
+                              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-left transition-all border-b border-gray-100 last:border-0 ${
+                                isSelected ? 'bg-yellow-50 text-yellow-900 border-l-4 border-l-yellow-400' : 'text-gray-700 hover:bg-gray-50 border-l-4 border-l-transparent'
+                              }`}>
+                              <Home size={14} className={isSelected ? "text-yellow-500" : "text-gray-400"} />
+                              <span className="flex-1 leading-tight">{main}</span>
+                              {isSelected && <ChevronRight size={14} className="text-yellow-500 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {/* Step 2: Subcategory */}
+                    <div className="border-r border-gray-200">
+                      <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
+                        <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center transition-colors ${selectedMain ? 'bg-blue-400 text-white' : 'bg-gray-200 text-gray-400'}`}>2</span>
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Subcategory</span>
+                      </div>
+                      <div className="overflow-y-auto max-h-56 p-3">
+                        {!selectedMain ? (
+                          <div className="h-full flex items-center justify-center text-xs text-gray-400 py-10 text-center">← Pick a main<br/>category first</div>
+                        ) : (() => {
+                          const catObj = categoriesData.find((c) => c.id === selectedMain);
+                          const subs = Object.keys(catObj?.document?.subcategories || {});
+                          return subs.length === 0 ? (
+                            <div className="text-xs text-gray-400 py-10 text-center">No subcategories</div>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              {subs.map((sub) => (
+                                <button key={sub} type="button"
+                                  onClick={() => { setSelectedCat(sub); setSelectedSub(""); setFormData((p) => ({ ...p, category: sub })); }}
+                                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    selectedCat === sub ? 'bg-blue-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                                  }`}>
+                                  {sub}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                    {/* Step 3: Item / Tag */}
+                    <div>
+                      <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
+                        <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center transition-colors ${selectedCat ? 'bg-green-400 text-white' : 'bg-gray-200 text-gray-400'}`}>3</span>
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Item / Tag</span>
+                      </div>
+                      <div className="overflow-y-auto max-h-56 p-3">
+                        {!selectedCat ? (
+                          <div className="h-full flex items-center justify-center text-xs text-gray-400 py-10 text-center">← Pick a<br/>subcategory first</div>
+                        ) : (() => {
+                          const catObj = categoriesData.find((c) => c.id === selectedMain);
+                          const items: string[] = catObj?.document?.subcategories?.[selectedCat]?.items || [];
+                          return (
+                            <div className="flex flex-col gap-2">
+                              {items.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {items.map((item) => (
+                                    <button key={item} type="button" onClick={() => setSelectedSub(item)}
+                                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                                        selectedSub === item ? 'bg-green-500 text-white border-green-500 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:border-green-400 hover:bg-green-50'
+                                      }`}>{item}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="border-t border-gray-100 pt-2">
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold mb-1.5">Or type custom</p>
+                                <input type="text" placeholder="Custom item / tag…" value={selectedSub}
+                                  onChange={(e) => setSelectedSub(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-green-400 focus:ring-1 focus:ring-green-100 transition bg-white text-gray-800" />
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Author *</label>
                   <input
                     type="text" name="author" value={formData.author} onChange={handleChange} required
                     placeholder="Author name"
-                    className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/10 transition"
                     maxLength={50}
                   />
                 </div>
               </div>
 
-
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">Tags</label>
                 <input
                   type="text" name="tags" value={formData.tags} onChange={handleChange}
-                  placeholder="smart home, automation, IoT, technology (comma separated)"
-                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 transition"
+                  placeholder="smart home, automation, IoT (comma separated)"
+                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/10 transition"
                   maxLength={200}
                 />
                 <small className="text-xs text-gray-500 mt-1 block">Tags help readers find related content</small>
@@ -192,25 +363,20 @@ export default function AddBlogPage() {
             </div>
           </div>
 
-          {/* Primary Image Card */}
+          {/* Primary Image */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">Primary Image *</h2>
-              <p className="text-sm text-gray-500">Upload a main image that will represent your blog post</p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">Primary Image</h2>
+              <p className="text-sm text-gray-500">Upload the main image for your blog post</p>
             </div>
             <div className="p-6">
               {!formData.primaryImage ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-md p-12 text-center bg-gray-50 hover:bg-[#ffd700]/5 hover:border-[#ffd700] transition cursor-pointer relative">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    required 
-                  />
+                  <input type="file" accept="image/*" onChange={handleImageUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-3" />
                   <div className="text-lg text-gray-600 mb-2"><strong>Click to upload primary image</strong> or drag and drop</div>
-                  <div className="text-sm text-gray-500">PNG, JPG, GIF up to 5MB (Required)</div>
+                  <div className="text-sm text-gray-500">PNG, JPG, GIF up to 5MB</div>
                 </div>
               ) : (
                 <div className="border border-gray-200 rounded-md p-4 text-center bg-white">
@@ -220,7 +386,8 @@ export default function AddBlogPage() {
                       Change Image
                       <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                     </label>
-                    <button type="button" onClick={removePrimaryImage} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded cursor-pointer text-sm font-medium transition">
+                    <button type="button" onClick={() => setFormData((p) => ({ ...p, primaryImage: "" }))}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition">
                       Remove
                     </button>
                   </div>
@@ -229,79 +396,87 @@ export default function AddBlogPage() {
             </div>
           </div>
 
-          {/* Content Card (Rich Text Editor) */}
+          {/* Content */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900 mb-1">Content</h2>
-              <p className="text-sm text-gray-500">Write your blog post content with comprehensive formatting tools</p>
+              <p className="text-sm text-gray-500">Write your blog post with full rich-text formatting</p>
             </div>
             <div className="p-6">
               <RichEditor
                 ref={editorRef}
                 placeholder="Write your blog post content here…"
                 minHeight={420}
-                onChange={html => setFormData(p => ({ ...p, content: html }))}
+                onChange={(html) => setFormData((p) => ({ ...p, content: html }))}
               />
             </div>
           </div>
 
-          {/* Publishing Options Card */}
+          {/* Publishing Options */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900 mb-1">Publishing Options</h2>
-              <p className="text-sm text-gray-500">Configure how your blog post will be published</p>
+              <p className="text-sm text-gray-500">SEO and reading settings</p>
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Status</label>
-                  <select 
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 bg-white cursor-pointer"
-                  >
-                    <option value="draft">Save as Draft</option>
-                    <option value="published">Publish Now</option>
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">Reading Time (minutes)</label>
                   <input
                     type="number" name="readingTime" value={formData.readingTime} onChange={handleChange} min="1" max="60"
                     placeholder="Estimated reading time"
-                    className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/10 transition"
                   />
                 </div>
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">Meta Description (SEO)</label>
                 <textarea
                   name="metaDescription" value={formData.metaDescription} onChange={handleChange}
                   placeholder="Brief description for search engines (max 160 characters)"
-                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-3 focus:ring-[#ffd700]/10 transition min-h-[80px]"
+                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:outline-none focus:border-[#ffd700] focus:ring-2 focus:ring-[#ffd700]/10 transition min-h-[80px]"
                   maxLength={160}
                 />
                 <small className="text-xs text-gray-500 mt-1 block">
-                  <span className={formData.metaDescription.length > 150 ? "text-red-500" : ""}>{formData.metaDescription.length}</span>/160 characters - This helps with search engine optimization
+                  <span className={formData.metaDescription.length > 150 ? "text-red-500" : ""}>
+                    {formData.metaDescription.length}
+                  </span>/160 characters
                 </small>
               </div>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 mt-2 mb-10">
-            <Link href="/dashboard/blog" className="px-6 py-3 bg-white text-gray-700 border border-gray-300 rounded-md text-base font-medium hover:bg-gray-50 transition">
-              Cancel
-            </Link>
-            <button type="submit" disabled={isSaving} className="px-8 py-3 bg-gradient-to-r from-[#ffd700] to-[#ffc000] text-black rounded-md text-base font-medium hover:shadow-md transition disabled:opacity-50 flex items-center gap-2">
-              {isSaving ? "Publishing..." : <><Save size={18} /> Publish Blog Post</>}
-            </button>
-          </div>
+          {/* Spacer so sticky footer doesn't overlap content */}
+          <div className="h-4" />
         </form>
+      </div>
+
+      {/* Sticky Footer */}
+      <div className="fixed bottom-0 left-0 lg:left-64 right-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between shadow-lg z-50">
+        <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
+          <div className={`w-2 h-2 rounded-full ${
+            draftStatus === "saving"  ? "bg-yellow-400 animate-pulse" :
+            draftStatus === "saved"   ? "bg-green-500" :
+            draftStatus === "unsaved" ? "bg-red-500" :
+            "bg-gray-300"
+          }`} />
+          {draftStatusLabel}
+        </div>
+        <div className="flex gap-3">
+          <Link href="/dashboard/blog"
+            className="px-5 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-50 transition shadow-sm">
+            Cancel
+          </Link>
+          <button type="button" onClick={() => handleSubmit("draft")} disabled={isSaving}
+            className="px-5 py-2.5 bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-lg text-sm font-semibold hover:bg-yellow-200 transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+            <Save size={15} /> Save Draft
+          </button>
+          <button type="button" onClick={() => handleSubmit("published")} disabled={isSaving}
+            className="px-7 py-2.5 bg-gradient-to-r from-[#ffd700] to-[#ffc000] text-black rounded-lg text-sm font-bold hover:shadow-md transition disabled:opacity-50 flex items-center gap-2">
+            {isSaving ? "Saving…" : "Publish Post"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   PlusCircle, ChevronRight, ChevronDown, Pencil, Trash2,
-  Image as ImageIcon, Tag, Search, BarChart2, Layers
+  Tag, Search, BarChart2, Layers
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -23,7 +23,6 @@ interface ModalState {
   // pre-filled values
   initName?: string;
   initPrefix?: string;
-  initLogo?: string;
 }
 
 const EMPTY_MODAL: ModalState = { open: false, mode: "add", type: "main" };
@@ -50,7 +49,6 @@ export default function CategoriesPage() {
   const [formParentSub, setFormParentSub] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchCategories(); }, []);
 
@@ -81,17 +79,8 @@ export default function CategoriesPage() {
     setModal(m);
     setFormName(m.initName || "");
     setFormPrefix(m.initPrefix || "");
-    setFormLogo(m.initLogo || "");
     setFormParentMain(m.parentMain || "");
     setFormParentSub(m.parentSub || "");
-  }
-
-  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setFormLogo(reader.result as string);
-    reader.readAsDataURL(file);
   }
 
   async function handleSave() {
@@ -103,13 +92,13 @@ export default function CategoriesPage() {
     try {
       let res: Response;
       if (modal.mode === "add") {
-        const body: any = { type: modal.type, name: formName.trim(), logo: formLogo };
+        const body: any = { type: modal.type, name: formName.trim() };
         if (modal.type === "main") body.prefix = formPrefix.trim();
         if (modal.type === "sub") body.parentMain = formParentMain; body.subName = formName.trim();
         if (modal.type === "subsub") { body.parentMain = formParentMain; body.parentSub = formParentSub; body.subSubName = formName.trim(); }
         res = await fetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       } else {
-        const body: any = { type: modal.type, oldName: modal.editOldName, newName: formName.trim(), logo: formLogo };
+        const body: any = { type: modal.type, oldName: modal.editOldName, newName: formName.trim() };
         if (modal.type === "sub") body.parentMain = modal.parentMain;
         if (modal.type === "subsub") { body.parentMain = modal.parentMain; body.parentSub = modal.parentSub; }
         res = await fetch("/api/categories", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -230,11 +219,6 @@ export default function CategoriesPage() {
                     onClick={() => toggleMain(row.id)}
                   >
                     {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    {mainDoc.logo ? (
-                      <img src={mainDoc.logo} alt="" className="w-6 h-6 rounded object-cover" />
-                    ) : (
-                      <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-xs">🏠</div>
-                    )}
                     <span className="font-bold flex-1">{row.id}</span>
                     <span className="text-[10px] bg-[#ffc800] text-black px-2 py-0.5 rounded-full font-bold">{mainDoc.code}</span>
                     <div className="flex gap-2 ml-2" onClick={e => e.stopPropagation()}>
@@ -248,7 +232,7 @@ export default function CategoriesPage() {
                       <button
                         onClick={() => openModal({
                           open: true, mode: "edit", type: "main", editOldName: row.id,
-                          initName: row.id, initPrefix: mainDoc.code?.split(/\d/)[0] || "", initLogo: mainDoc.logo,
+                          initName: row.id, initPrefix: mainDoc.code?.split(/\d/)[0] || "",
                         })}
                         className="text-xs bg-blue-500/30 hover:bg-blue-500/50 px-2 py-1 rounded"
                         title="Edit"
@@ -277,11 +261,6 @@ export default function CategoriesPage() {
                               onClick={() => toggleSub(subKey)}
                             >
                               {isSubOpen ? <ChevronDown size={14} className="text-gray-700" /> : <ChevronRight size={14} className="text-gray-700" />}
-                              {subData.logo ? (
-                                <img src={subData.logo} alt="" className="w-5 h-5 rounded object-cover" />
-                              ) : (
-                                <div className="w-5 h-5 rounded bg-gray-200 flex items-center justify-center text-xs">🔧</div>
-                              )}
                               <span className="font-semibold text-sm flex-1 text-gray-900">{subName}</span>
                               <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
                                 Parent: {mainDoc.code?.split(/\d/)[0]}
@@ -298,7 +277,7 @@ export default function CategoriesPage() {
                                   onClick={() => openModal({
                                     open: true, mode: "edit", type: "sub",
                                     parentMain: row.id, editOldName: subName,
-                                    initName: subName, initLogo: subData.logo,
+                                    initName: subName,
                                   })}
                                   className="text-xs text-blue-500 hover:text-blue-700"
                                 ><Pencil size={12} /></button>
@@ -329,7 +308,6 @@ export default function CategoriesPage() {
                                           open: true, mode: "edit", type: "subsub",
                                           parentMain: row.id, parentSub: subName,
                                           editOldName: item, initName: item,
-                                          initLogo: subData.itemLogos?.[item],
                                         })}
                                         className="text-blue-400 hover:text-blue-600"
                                       ><Pencil size={12} /></button>
@@ -445,28 +423,6 @@ export default function CategoriesPage() {
                   placeholder={modal.type === "main" ? "e.g., Automation Solutions" : modal.type === "sub" ? "e.g., Lighting Automation" : "e.g., Smart Bulbs"}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#ffc800]"
                 />
-              </div>
-
-              {/* Logo */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Logo (Optional)</label>
-                <div
-                  className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center gap-4 cursor-pointer hover:border-[#ffc800] hover:bg-yellow-50 transition"
-                  onClick={() => logoInputRef.current?.click()}
-                >
-                  {formLogo ? (
-                    <img src={formLogo} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <ImageIcon size={20} className="text-gray-400" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{formLogo ? "Change logo" : "Upload logo"}</p>
-                    <p className="text-xs text-gray-400">PNG, JPG up to 2MB</p>
-                  </div>
-                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-                </div>
               </div>
             </div>
 

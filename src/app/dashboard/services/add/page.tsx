@@ -14,11 +14,30 @@ import {
   X,
   Scissors,
   Save,
-  Palette
+  Palette,
+  CheckSquare,
+  Undo,
+  Italic,
+  Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  Redo,
+  Bold,
+  Underline,
+  AlignRight,
+  AlignJustify,
+  Link as LinkIcon,
+  Table,
+  Clock,
+  AlertTriangle,
+  Bookmark,
+  BookOpen,
+  Trash2
 } from "lucide-react";
 import RichEditor, { RichEditorHandle } from "@/components/ui/RichEditor";
 
 // Types for our dynamic form
+const SERVICE_DRAFT_KEY = "service_form_draft";
 interface Feature {
   id: string;
   title: string;
@@ -32,6 +51,7 @@ interface ServicePackage {
   included: Feature[];
   notIncluded: Feature[];
   complimentary: Feature[];
+  galleryImages?: (string | null)[];
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -41,8 +61,39 @@ const defaultPackage = (): ServicePackage => ({
   pricePopup: "",
   included: [defaultFeature()],
   notIncluded: [defaultFeature()],
-  complimentary: [defaultFeature()]
+  complimentary: [defaultFeature()],
+  galleryImages: [null, null, null, null, null]
 });
+
+// ── Feature Library (localStorage) ──────────────────────────────────────────
+const FEATURE_LIBRARY_KEY = "service_feature_library";
+type LibraryType = 'included' | 'notIncluded' | 'complimentary';
+interface LibraryEntry extends Feature { savedAt: string; }
+type FeatureLibrary = Record<LibraryType, LibraryEntry[]>;
+
+const getLibrary = (): FeatureLibrary => {
+  try {
+    const raw = localStorage.getItem(FEATURE_LIBRARY_KEY);
+    return raw ? JSON.parse(raw) : { included: [], notIncluded: [], complimentary: [] };
+  } catch { return { included: [], notIncluded: [], complimentary: [] }; }
+};
+
+const saveToLibrary = (type: LibraryType, feature: Feature): void => {
+  try {
+    const lib = getLibrary();
+    const entry: LibraryEntry = { ...feature, id: generateId(), savedAt: new Date().toISOString() };
+    lib[type] = [entry, ...lib[type].filter(e => e.title !== feature.title)];
+    localStorage.setItem(FEATURE_LIBRARY_KEY, JSON.stringify(lib));
+  } catch { /* ignore */ }
+};
+
+const removeFromLibrary = (type: LibraryType, id: string): void => {
+  try {
+    const lib = getLibrary();
+    lib[type] = lib[type].filter(e => e.id !== id);
+    localStorage.setItem(FEATURE_LIBRARY_KEY, JSON.stringify(lib));
+  } catch { /* ignore */ }
+};
 
 // ── Service Gallery Component ─────────────────────────────────────────────
 // Ports the HTML's multi-select + drag-to-swap + file-drop + remove logic to React.
@@ -61,10 +112,16 @@ const GALLERY_SLOTS: GallerySlotDef[] = [
   { label: "Click to upload",             size: "328×195px", className: "w-[328px] h-[195px]" },
 ];
 
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|svg|bmp|avif|tiff?)$/i;
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || IMAGE_EXT_RE.test(file.name);
+}
+
 function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
+    reader.onload  = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
 }
@@ -85,7 +142,7 @@ const ServiceGallery = ({
       const next = [...images];
       for (let i = 0; i < files.length && startIndex + i < GALLERY_SLOTS.length; i++) {
         const file = files[i];
-        if (file.type.startsWith("image/")) {
+        if (isImageFile(file)) {
           next[startIndex + i] = await readFileAsBase64(file);
         }
       }
@@ -115,10 +172,17 @@ const ServiceGallery = ({
   };
 
   // ── Drag-to-swap handlers ────────────────────────────────────────────────
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+
   const onDragStart = (e: React.DragEvent, slotIndex: number) => {
     if (!images[slotIndex]) { e.preventDefault(); return; }
     dragSlot.current = slotIndex;
     e.dataTransfer.effectAllowed = "move";
+  };
+
+  const onDragEnter = (e: React.DragEvent, slotIndex: number) => {
+    e.preventDefault();
+    setDragOverSlot(slotIndex);
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -126,8 +190,16 @@ const ServiceGallery = ({
     e.dataTransfer.dropEffect = "move";
   };
 
+  const onDragLeave = (e: React.DragEvent, slotIndex: number) => {
+    // Only clear when truly leaving this slot (not entering a child)
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setDragOverSlot(prev => prev === slotIndex ? null : prev);
+    }
+  };
+
   const onDrop = async (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
+    setDragOverSlot(null);
     // File drop from OS
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       await fillSlots(e.dataTransfer.files, targetIndex);
@@ -143,39 +215,44 @@ const ServiceGallery = ({
     dragSlot.current = null;
   };
 
-  const onDragEnd = () => { dragSlot.current = null; };
+  const onDragEnd = () => { dragSlot.current = null; setDragOverSlot(null); };
 
   // ── Render ───────────────────────────────────────────────────────────────
   const renderSlot = (slotIndex: number) => {
     const slot = GALLERY_SLOTS[slotIndex];
     const img = images[slotIndex];
+    const isOver = dragOverSlot === slotIndex;
     return (
       <div
         key={slotIndex}
         className={`relative group border-2 rounded-lg overflow-hidden cursor-pointer transition-all
-          ${img ? 'border-solid border-gray-300' : 'border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100'}
+          ${isOver ? 'border-blue-400 bg-blue-50 scale-[1.02]' : img ? 'border-solid border-gray-300' : 'border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100'}
           ${slot.className}`}
         draggable={!!img}
         onDragStart={(e) => onDragStart(e, slotIndex)}
+        onDragEnter={(e) => onDragEnter(e, slotIndex)}
         onDragOver={onDragOver}
+        onDragLeave={(e) => onDragLeave(e, slotIndex)}
         onDrop={(e) => onDrop(e, slotIndex)}
         onDragEnd={onDragEnd}
         onClick={() => handleSlotClick(slotIndex)}
         title={img ? 'Drag to swap • Click to replace' : 'Click or drop image'}
       >
+        {isOver && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-blue-500/20 border-2 border-blue-400 rounded-lg pointer-events-none">
+            <span className="text-blue-700 font-bold text-sm bg-white/80 px-3 py-1 rounded-full shadow">Drop here</span>
+          </div>
+        )}
         {img ? (
           <>
-            <img src={img} alt={`Gallery slot ${slotIndex + 1}`} className="w-full h-full object-cover" />
-            {/* Overlay on hover */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+            <img src={img} alt={`Gallery slot ${slotIndex + 1}`} className="w-full h-full object-cover pointer-events-none" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 pointer-events-none">
               <Camera className="text-white w-6 h-6" />
               <span className="text-white text-xs font-semibold">Replace</span>
             </div>
-            {/* Badge */}
-            <div className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+            <div className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
               Slot {slotIndex + 1}
             </div>
-            {/* Remove button */}
             <button
               type="button"
               onClick={(e) => handleRemove(slotIndex, e)}
@@ -186,7 +263,7 @@ const ServiceGallery = ({
             </button>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center w-full h-full p-4">
+          <div className="flex flex-col items-center justify-center w-full h-full p-4 pointer-events-none">
             <Camera className="text-gray-400 w-6 h-6 mb-1" />
             <span className="text-xs font-semibold text-gray-700 text-center whitespace-pre-line">{slot.label}</span>
             <span className="text-[10px] text-yellow-500 font-medium mt-1">{slot.size}</span>
@@ -230,13 +307,215 @@ const ServiceGallery = ({
   );
 };
 
+// ── Drag-and-drop image zone for FeatureItem ──────────────────────────────
+const FeatureImageDrop = ({
+  image,
+  isComplimentary,
+  isExclusion,
+  onFile,
+}: {
+  image?: string;
+  isComplimentary?: boolean;
+  isExclusion?: boolean;
+  onFile: (base64: string) => void;
+}) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const zoneRef = useRef<HTMLDivElement>(null);
+
+  const readFile = (file: File) => {
+    if (!isImageFile(file)) return;
+    const reader = new FileReader();
+    reader.onloadend = () => onFile(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const onDragEnter = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
+  const onDragOver  = (e: React.DragEvent) => { e.preventDefault(); };
+  const onDragLeave = (e: React.DragEvent) => {
+    // Only clear when cursor truly leaves the zone (not just enters a child)
+    if (zoneRef.current && !zoneRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) readFile(file);
+  };
+
+  const label = isComplimentary ? 'Complimentary' : isExclusion ? 'Not Included' : 'Feature';
+  const size = isComplimentary ? 'w-24 h-24' : 'w-20 h-20';
+
+  return (
+    <div
+      ref={zoneRef}
+      className={`relative group flex-shrink-0 ${size} rounded-lg overflow-hidden cursor-pointer border-2 transition-all
+        ${isDragOver
+          ? 'border-blue-400 bg-blue-50 scale-105'
+          : image
+          ? 'border-solid border-gray-300'
+          : 'border-dashed border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'}`}
+      onClick={() => inputRef.current?.click()}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      title={image ? 'Drop or click to replace' : 'Drop image or click to upload'}
+    >
+      {/* pointer-events-none on children prevents them from stealing drag events */}
+      {image ? (
+        <>
+          <img src={image} alt="Preview" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 pointer-events-none">
+            <Camera className="text-white w-4 h-4" />
+            <span className="text-white text-[9px] font-semibold">Replace</span>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center w-full h-full p-1 gap-1 pointer-events-none">
+          {isDragOver
+            ? <span className="text-blue-500 text-[9px] font-bold text-center leading-tight">Drop<br/>here!</span>
+            : <>
+                <Camera className="text-gray-400 w-4 h-4" />
+                <span className="text-[9px] text-gray-400 text-center leading-tight">{label}<br/>Drop / Click</span>
+              </>
+          }
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept="image/*"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) readFile(f); }}
+      />
+    </div>
+  );
+};
+
+
+// ── Feature Library Modal ────────────────────────────────────────────────────
+const FeatureLibraryModal = ({
+  type,
+  onInsert,
+  onClose,
+}: {
+  type: LibraryType;
+  onInsert: (features: Feature[]) => void;
+  onClose: () => void;
+}) => {
+  const [lib, setLib] = useState<LibraryEntry[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLib(getLibrary()[type]);
+  }, [type]);
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const handleDelete = (id: string) => {
+    removeFromLibrary(type, id);
+    setLib(prev => prev.filter(e => e.id !== id));
+    setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  const handleInsert = () => {
+    const toInsert = lib.filter(e => selected.has(e.id)).map(e => ({ ...e, id: generateId() }));
+    if (toInsert.length) onInsert(toInsert);
+    onClose();
+  };
+
+  const typeLabel = type === 'included' ? "What's Included" : type === 'notIncluded' ? "What's Not Included" : "Complimentary Works";
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <BookOpen size={18} className="text-blue-500" />
+            <h3 className="font-bold text-gray-800 text-lg">Feature Library</h3>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{typeLabel}</span>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition"><X size={20} /></button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-4">
+          {lib.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+              <BookOpen size={40} className="opacity-30" />
+              <p className="text-sm font-medium">No saved items yet</p>
+              <p className="text-xs text-center">Click the <Bookmark size={12} className="inline mx-0.5" /> bookmark on any feature item to save it here for reuse.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {lib.map(entry => (
+                <div
+                  key={entry.id}
+                  onClick={() => toggle(entry.id)}
+                  className={`flex gap-3 items-center p-3 rounded-xl border-2 cursor-pointer transition-all ${selected.has(entry.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                >
+                  {/* Checkbox */}
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${selected.has(entry.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                    {selected.has(entry.id) && <span className="text-white text-xs font-bold">✓</span>}
+                  </div>
+                  {/* Thumbnail */}
+                  {entry.image && (
+                    <img src={entry.image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" />
+                  )}
+                  {/* Text */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{entry.title || <span className="text-gray-400 italic">Untitled</span>}</p>
+                    {entry.description && <p className="text-xs text-gray-500 truncate mt-0.5">{entry.description}</p>}
+                  </div>
+                  {/* Delete from library */}
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
+                    className="shrink-0 text-gray-300 hover:text-red-500 transition p-1 rounded"
+                    title="Remove from library"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          <span className="text-xs text-gray-400">{selected.size} item{selected.size !== 1 ? 's' : ''} selected</span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+            <button
+              onClick={handleInsert}
+              disabled={selected.size === 0}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Insert {selected.size > 0 ? `(${selected.size})` : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FeatureItem = ({ 
   item, 
   isExclusion = false, 
   isComplimentary = false,
   onChange, 
   onDelete, 
-  onReplicate 
+  onReplicate,
+  onSaveToLibrary,
 }: { 
   item: Feature;
   isExclusion?: boolean;
@@ -244,58 +523,61 @@ const FeatureItem = ({
   onChange: (field: string, val: string) => void;
   onDelete: () => void;
   onReplicate: () => void;
-}) => (
-  <div className={`flex gap-4 items-start border p-3 rounded-lg bg-gray-50/50 mb-3 relative ${isComplimentary ? 'border-yellow-400' : 'border-gray-100'}`}>
-    <div className="flex-1 flex flex-col gap-2">
-      <input 
-        type="text" 
-        value={item.title}
-        onChange={(e) => onChange('title', e.target.value)}
-        placeholder={isComplimentary ? "Complimentary work title" : isExclusion ? "Exclusion title" : "Feature title"} 
-        className={`border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900 bg-white outline-none ${isComplimentary ? 'focus:border-yellow-400' : 'focus:border-blue-400'}`} 
-      />
-      <textarea 
-        value={item.description}
-        onChange={(e) => onChange('description', e.target.value)}
-        placeholder={isComplimentary ? "Complimentary work description" : isExclusion ? "Exclusion description" : "Feature description"} 
-        rows={isComplimentary ? 3 : 2} 
-        className={`border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900 bg-white outline-none resize-none ${isComplimentary ? 'focus:border-yellow-400' : 'focus:border-blue-400'}`}
-      ></textarea>
-    </div>
-    <div className="flex flex-col items-center justify-center gap-2">
-      <div className={`w-20 h-20 bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-xs text-gray-400 text-center p-1 relative overflow-hidden ${isComplimentary ? 'w-24 h-24' : ''}`}>
-        {item.image ? (
-          <img src={item.image} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          isComplimentary ? "Complimentary" : isExclusion ? "Not Included" : "Feature"
-        )}
-      </div>
-      <label className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold py-1.5 px-3 rounded w-full transition text-center cursor-pointer block">
-        Upload Image
+  onSaveToLibrary: () => void;
+}) => {
+  const [saved, setSaved] = useState(false);
+  const handleSave = () => {
+    onSaveToLibrary();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+  return (
+    <div className={`flex gap-4 items-start border p-3 rounded-lg bg-gray-50/50 mb-3 relative ${isComplimentary ? 'border-yellow-400' : 'border-gray-100'}`}>
+      <div className="flex-1 flex flex-col gap-2">
         <input 
-          type="file" 
-          className="hidden" 
-          accept="image/*" 
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onloadend = () => onChange('image', reader.result as string);
-            reader.readAsDataURL(file);
-          }} 
+          type="text" 
+          value={item.title}
+          onChange={(e) => onChange('title', e.target.value)}
+          placeholder={isComplimentary ? "Complimentary work title" : isExclusion ? "Exclusion title" : "Feature title"} 
+          className={`border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900 bg-white outline-none ${isComplimentary ? 'focus:border-yellow-400' : 'focus:border-blue-400'}`} 
         />
-      </label>
+        <textarea 
+          value={item.description}
+          onChange={(e) => onChange('description', e.target.value)}
+          placeholder={isComplimentary ? "Complimentary work description" : isExclusion ? "Exclusion description" : "Feature description"} 
+          rows={isComplimentary ? 3 : 2} 
+          className={`border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900 bg-white outline-none resize-none ${isComplimentary ? 'focus:border-yellow-400' : 'focus:border-blue-400'}`}
+        ></textarea>
+      </div>
+      {/* Drag-and-drop image */}
+      <FeatureImageDrop
+        image={item.image}
+        isComplimentary={isComplimentary}
+        isExclusion={isExclusion}
+        onFile={(base64) => onChange('image', base64)}
+      />
+      <div className="flex flex-col gap-2">
+        {/* Save to library */}
+        <button
+          onClick={handleSave}
+          title="Save to library for reuse"
+          className={`text-xs font-semibold py-1.5 px-2 rounded flex items-center gap-1 transition ${saved ? 'bg-green-500 text-white' : 'bg-gray-100 hover:bg-blue-100 text-gray-600 hover:text-blue-600 border border-gray-200'}`}
+        >
+          <Bookmark size={12} className={saved ? 'fill-white' : ''} />
+          {saved ? 'Saved!' : 'Save'}
+        </button>
+        <button onClick={onReplicate} className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold py-1.5 px-2 rounded flex items-center gap-1 transition">
+          <Copy size={12} /> Replicate
+        </button>
+        <button onClick={onDelete} className="bg-red-500 hover:bg-red-600 text-white text-xs p-1.5 flex items-center justify-center transition mx-auto w-8 h-8 rounded-full">
+          <X size={14} />
+        </button>
+      </div>
     </div>
-    <div className="flex flex-col gap-2">
-      <button onClick={onReplicate} className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold py-1.5 px-2 rounded flex items-center gap-1 transition">
-        <Copy size={12} /> Replicate
-      </button>
-      <button onClick={onDelete} className="bg-red-500 hover:bg-red-600 text-white text-xs p-1.5 flex items-center justify-center transition mx-auto w-8 h-8 rounded-full">
-        <X size={14} />
-      </button>
-    </div>
-  </div>
-);
+  );
+};
+
+
 
 
 // ── Package Gallery Component ────────────────────────────────────────────
@@ -325,7 +607,7 @@ const PackageGallery = ({
       const next = [...images];
       for (let i = 0; i < files.length && startIndex + i < PKG_GALLERY_SLOTS.length; i++) {
         const file = files[i];
-        if (file.type.startsWith("image/")) {
+        if (isImageFile(file)) {
           next[startIndex + i] = await readFileAsBase64(file);
         }
       }
@@ -353,10 +635,17 @@ const PackageGallery = ({
     onChange(next);
   };
 
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+
   const onDragStart = (e: React.DragEvent, slotIndex: number) => {
     if (!images[slotIndex]) { e.preventDefault(); return; }
     dragSlot.current = slotIndex;
     e.dataTransfer.effectAllowed = "move";
+  };
+
+  const onDragEnter = (e: React.DragEvent, slotIndex: number) => {
+    e.preventDefault();
+    setDragOverSlot(slotIndex);
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -364,8 +653,15 @@ const PackageGallery = ({
     e.dataTransfer.dropEffect = "move";
   };
 
+  const onDragLeave = (e: React.DragEvent, slotIndex: number) => {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setDragOverSlot(prev => prev === slotIndex ? null : prev);
+    }
+  };
+
   const onDrop = async (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
+    setDragOverSlot(null);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       await fillSlots(e.dataTransfer.files, targetIndex);
       dragSlot.current = null;
@@ -379,33 +675,41 @@ const PackageGallery = ({
     dragSlot.current = null;
   };
 
-  const onDragEnd = () => { dragSlot.current = null; };
+  const onDragEnd = () => { dragSlot.current = null; setDragOverSlot(null); };
 
   const renderSlot = (slotIndex: number, extraClass = "") => {
     const slot = PKG_GALLERY_SLOTS[slotIndex];
     const img = images[slotIndex];
+    const isOver = dragOverSlot === slotIndex;
     return (
       <div
         key={slotIndex}
         className={`relative group border-2 rounded-lg overflow-hidden cursor-pointer transition-all
-          ${img ? 'border-solid border-gray-300' : 'border-dashed border-gray-200 bg-gray-50 hover:bg-gray-100'}
+          ${isOver ? 'border-blue-400 bg-blue-50 scale-[1.02]' : img ? 'border-solid border-gray-300' : 'border-dashed border-gray-200 bg-gray-50 hover:bg-gray-100'}
           ${slot.className} ${extraClass}`}
         draggable={!!img}
         onDragStart={(e) => onDragStart(e, slotIndex)}
+        onDragEnter={(e) => onDragEnter(e, slotIndex)}
         onDragOver={onDragOver}
+        onDragLeave={(e) => onDragLeave(e, slotIndex)}
         onDrop={(e) => onDrop(e, slotIndex)}
         onDragEnd={onDragEnd}
         onClick={() => handleSlotClick(slotIndex)}
         title={img ? 'Drag to swap • Click to replace' : 'Click or drop image'}
       >
+        {isOver && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-blue-500/20 border-2 border-blue-400 rounded-lg pointer-events-none">
+            <span className="text-blue-700 font-bold text-sm bg-white/80 px-3 py-1 rounded-full shadow">Drop here</span>
+          </div>
+        )}
         {img ? (
           <>
-            <img src={img} alt={`Package slot ${slotIndex + 1}`} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+            <img src={img} alt={`Package slot ${slotIndex + 1}`} className="w-full h-full object-cover pointer-events-none" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 pointer-events-none">
               <Camera className="text-white w-5 h-5" />
               <span className="text-white text-xs font-semibold">Replace</span>
             </div>
-            <div className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+            <div className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
               Slot {slotIndex + 1}
             </div>
             <button
@@ -416,7 +720,7 @@ const PackageGallery = ({
             >×</button>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center w-full h-full p-4">
+          <div className="flex flex-col items-center justify-center w-full h-full p-4 pointer-events-none">
             <Camera className="text-gray-400 w-6 h-6 mb-1" />
             <span className="text-xs font-semibold text-gray-700 text-center whitespace-pre-line">{slot.label}</span>
             <span className="text-[10px] text-yellow-500 font-medium mt-1">{slot.size}</span>
@@ -472,27 +776,31 @@ const PackageSection = ({
   pkgData: ServicePackage;
   updatePkg: (data: ServicePackage) => void;
 }) => {
-  const [pkgGalleryImages, setPkgGalleryImages] = useState<(string | null)[]>([null, null, null, null, null]);
+  const [libraryModal, setLibraryModal] = useState<LibraryType | null>(null);
 
-  const addFeature = (type: 'included' | 'notIncluded' | 'complimentary') => {
+  const addFeature = (type: LibraryType) => {
     updatePkg({ ...pkgData, [type]: [...pkgData[type], defaultFeature()] });
   };
+
+  const insertFromLibrary = (type: LibraryType, features: Feature[]) => {
+    updatePkg({ ...pkgData, [type]: [...pkgData[type], ...features] });
+  };
   
-  const updateFeature = (type: 'included' | 'notIncluded' | 'complimentary', id: string, field: string, val: string) => {
+  const updateFeature = (type: LibraryType, id: string, field: string, val: string) => {
     updatePkg({
       ...pkgData,
       [type]: pkgData[type].map(f => f.id === id ? { ...f, [field]: val } : f)
     });
   };
 
-  const removeFeature = (type: 'included' | 'notIncluded' | 'complimentary', id: string) => {
+  const removeFeature = (type: LibraryType, id: string) => {
     updatePkg({
       ...pkgData,
       [type]: pkgData[type].filter(f => f.id !== id)
     });
   };
   
-  const replicateFeature = (type: 'included' | 'notIncluded' | 'complimentary', id: string) => {
+  const replicateFeature = (type: LibraryType, id: string) => {
     const item = pkgData[type].find(f => f.id === id);
     if (item) {
       updatePkg({
@@ -503,120 +811,149 @@ const PackageSection = ({
   };
 
   return (
-    <div className="border border-gray-200 rounded-xl bg-white overflow-hidden mb-6 shadow-sm">
-      <div className={`border-b-[3px] p-4 flex items-center gap-3 ${borderColor}`}>
-        <div className={`w-6 h-6 ${iconColor} border-2 border-[#8b4513] rounded shadow-sm`}></div>
-        <h4 className="text-xl font-bold text-gray-800">{title}</h4>
-      </div>
+    <>
+      {/* Feature Library Modal */}
+      {libraryModal && (
+        <FeatureLibraryModal
+          type={libraryModal}
+          onInsert={(features) => insertFromLibrary(libraryModal, features)}
+          onClose={() => setLibraryModal(null)}
+        />
+      )}
+
+      <div className="border border-gray-200 rounded-xl bg-white overflow-hidden mb-6 shadow-sm">
+        <div className={`border-b-[3px] p-4 flex items-center gap-3 ${borderColor}`}>
+          <div className={`w-6 h-6 ${iconColor} border-2 border-[#8b4513] rounded shadow-sm`}></div>
+          <h4 className="text-xl font-bold text-gray-800">{title}</h4>
+        </div>
       
-      <div className="p-6">
-        <div className="mb-4">
-          <label className="block text-sm font-bold text-gray-800 mb-2">Price Information</label>
-          <input 
-            type="text" 
-            value={pkgData.priceInfo}
-            onChange={(e) => updatePkg({...pkgData, priceInfo: e.target.value})}
-            placeholder="e.g., Starting from ₹1999 or Custom pricing available" 
-            className="w-full border border-gray-200 rounded-lg px-4 py-2 text-gray-900 bg-white outline-none focus:border-yellow-400 transition" 
-          />
-        </div>
-        <div className="mb-8">
-          <label className="block text-sm font-bold text-gray-800 mb-2">Price for popup (₹)</label>
-          <input 
-            type="text" 
-            value={pkgData.pricePopup}
-            onChange={(e) => updatePkg({...pkgData, pricePopup: e.target.value})}
-            placeholder="Enter price in INR" 
-            className="w-full border border-gray-200 rounded-lg px-4 py-2 text-gray-900 bg-white outline-none focus:border-yellow-400 transition" 
-          />
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* What's Included */}
-          <div className="border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-4 border-b border-yellow-400 pb-2">
-              <div className="bg-green-500 rounded p-0.5"><CheckSquare size={16} className="text-white" /></div>
-              <h5 className="font-bold text-gray-800 text-lg">What's Included</h5>
-            </div>
-            
-            {pkgData.included.map((item) => (
-              <FeatureItem 
-                key={item.id} 
-                item={item} 
-                onChange={(f, v) => updateFeature('included', item.id, f, v)}
-                onDelete={() => removeFeature('included', item.id)}
-                onReplicate={() => replicateFeature('included', item.id)}
-              />
-            ))}
-            
-            <button onClick={() => addFeature('included')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md text-sm mx-auto block transition shadow-sm mt-4">
-              + Add Feature
-            </button>
+        <div className="p-6">
+          <div className="mb-4">
+            <label className="block text-sm font-bold text-gray-800 mb-2">Price Information</label>
+            <input 
+              type="text" 
+              value={pkgData.priceInfo}
+              onChange={(e) => updatePkg({...pkgData, priceInfo: e.target.value})}
+              placeholder="e.g., Starting from ₹1999 or Custom pricing available" 
+              className="w-full border border-gray-200 rounded-lg px-4 py-2 text-gray-900 bg-white outline-none focus:border-yellow-400 transition" 
+            />
+          </div>
+          <div className="mb-8">
+            <label className="block text-sm font-bold text-gray-800 mb-2">Price for popup (₹)</label>
+            <input 
+              type="text" 
+              value={pkgData.pricePopup}
+              onChange={(e) => updatePkg({...pkgData, pricePopup: e.target.value})}
+              placeholder="Enter price in INR" 
+              className="w-full border border-gray-200 rounded-lg px-4 py-2 text-gray-900 bg-white outline-none focus:border-yellow-400 transition" 
+            />
           </div>
 
-          {/* What's Not Included */}
-          <div className="border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-4 border-b border-yellow-400 pb-2">
-              <X size={20} className="text-red-500 stroke-[3]" />
-              <h5 className="font-bold text-gray-800 text-lg">What's Not Included</h5>
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* What's Included */}
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-4 border-b border-yellow-400 pb-2">
+                <div className="bg-green-500 rounded p-0.5"><CheckSquare size={16} className="text-white" /></div>
+                <h5 className="font-bold text-gray-800 text-lg flex-1">What's Included</h5>
+              </div>
+              
+              {pkgData.included.map((item) => (
+                <FeatureItem 
+                  key={item.id} 
+                  item={item} 
+                  onChange={(f, v) => updateFeature('included', item.id, f, v)}
+                  onDelete={() => removeFeature('included', item.id)}
+                  onReplicate={() => replicateFeature('included', item.id)}
+                  onSaveToLibrary={() => saveToLibrary('included', item)}
+                />
+              ))}
+              
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <button onClick={() => addFeature('included')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md text-sm transition shadow-sm">
+                  + Add Feature
+                </button>
+                <button onClick={() => setLibraryModal('included')} className="flex items-center gap-1.5 border border-blue-300 text-blue-600 hover:bg-blue-50 font-semibold py-2 px-3 rounded-md text-sm transition">
+                  <BookOpen size={14} /> From Library
+                </button>
+              </div>
             </div>
-            
-            {pkgData.notIncluded.map((item) => (
-              <FeatureItem 
-                key={item.id} 
-                item={item} 
-                isExclusion 
-                onChange={(f, v) => updateFeature('notIncluded', item.id, f, v)}
-                onDelete={() => removeFeature('notIncluded', item.id)}
-                onReplicate={() => replicateFeature('notIncluded', item.id)}
-              />
-            ))}
 
-            <button onClick={() => addFeature('notIncluded')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md text-sm mx-auto block transition shadow-sm mt-4">
-              + Add Exclusion
-            </button>
-          </div>
-        </div>
+            {/* What's Not Included */}
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-4 border-b border-yellow-400 pb-2">
+                <X size={20} className="text-red-500 stroke-[3]" />
+                <h5 className="font-bold text-gray-800 text-lg flex-1">What's Not Included</h5>
+              </div>
+              
+              {pkgData.notIncluded.map((item) => (
+                <FeatureItem 
+                  key={item.id} 
+                  item={item} 
+                  isExclusion 
+                  onChange={(f, v) => updateFeature('notIncluded', item.id, f, v)}
+                  onDelete={() => removeFeature('notIncluded', item.id)}
+                  onReplicate={() => replicateFeature('notIncluded', item.id)}
+                  onSaveToLibrary={() => saveToLibrary('notIncluded', item)}
+                />
+              ))}
 
-        {/* Complimentary Works */}
-        <div className="mb-8">
-          <div className="border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-4 border-b border-yellow-400 pb-2">
-              <Gift size={20} className="text-yellow-500 fill-yellow-500" />
-              <h5 className="font-bold text-gray-800 text-lg">Complimentary Works</h5>
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <button onClick={() => addFeature('notIncluded')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md text-sm transition shadow-sm">
+                  + Add Exclusion
+                </button>
+                <button onClick={() => setLibraryModal('notIncluded')} className="flex items-center gap-1.5 border border-blue-300 text-blue-600 hover:bg-blue-50 font-semibold py-2 px-3 rounded-md text-sm transition">
+                  <BookOpen size={14} /> From Library
+                </button>
+              </div>
             </div>
-            
-            {pkgData.complimentary.map((item) => (
-              <FeatureItem 
-                key={item.id} 
-                item={item} 
-                isComplimentary 
-                onChange={(f, v) => updateFeature('complimentary', item.id, f, v)}
-                onDelete={() => removeFeature('complimentary', item.id)}
-                onReplicate={() => replicateFeature('complimentary', item.id)}
-              />
-            ))}
-
-            <button onClick={() => addFeature('complimentary')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md text-sm mx-auto block transition shadow-sm mt-4">
-              + Add Complimentary Work
-            </button>
           </div>
-        </div>
 
-        {/* Package Gallery Images */}
-        <div>
-          <h5 className="font-bold text-gray-800 mb-1 text-sm">{title} Gallery Images</h5>
-          <p className="text-sm text-gray-500 mb-4">
-            Click a slot to upload • select multiple files to fill slots sequentially • drag a filled slot onto another to swap • drop files from your OS directly onto a slot.
-          </p>
-          <PackageGallery
-            images={pkgGalleryImages}
-            onChange={setPkgGalleryImages}
-            isPremium={isPremium}
-          />
+          {/* Complimentary Works */}
+          <div className="mb-8">
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-4 border-b border-yellow-400 pb-2">
+                <Gift size={20} className="text-yellow-500 fill-yellow-500" />
+                <h5 className="font-bold text-gray-800 text-lg flex-1">Complimentary Works</h5>
+              </div>
+              
+              {pkgData.complimentary.map((item) => (
+                <FeatureItem 
+                  key={item.id} 
+                  item={item} 
+                  isComplimentary 
+                  onChange={(f, v) => updateFeature('complimentary', item.id, f, v)}
+                  onDelete={() => removeFeature('complimentary', item.id)}
+                  onReplicate={() => replicateFeature('complimentary', item.id)}
+                  onSaveToLibrary={() => saveToLibrary('complimentary', item)}
+                />
+              ))}
+
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <button onClick={() => addFeature('complimentary')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-md text-sm transition shadow-sm">
+                  + Add Complimentary Work
+                </button>
+                <button onClick={() => setLibraryModal('complimentary')} className="flex items-center gap-1.5 border border-blue-300 text-blue-600 hover:bg-blue-50 font-semibold py-2 px-3 rounded-md text-sm transition">
+                  <BookOpen size={14} /> From Library
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Package Gallery Images */}
+          <div>
+            <h5 className="font-bold text-gray-800 mb-1 text-sm">{title} Gallery Images</h5>
+            <p className="text-sm text-gray-500 mb-4">
+              Click a slot to upload • select multiple files to fill slots sequentially • drag a filled slot onto another to swap • drop files from your OS directly onto a slot.
+            </p>
+            <PackageGallery
+              images={pkgData.galleryImages || [null, null, null, null, null]}
+              onChange={(imgs) => updatePkg({ ...pkgData, galleryImages: imgs })}
+              isPremium={isPremium}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -714,12 +1051,6 @@ export default function AddServicePage() {
   const [seoTags, setSeoTags] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(data => {
-      if (Array.isArray(data)) setCategoriesData(data);
-    }).catch(console.error);
-  }, []);
-
   const [packages, setPackages] = useState({
     basic: defaultPackage(),
     premium: defaultPackage(),
@@ -728,6 +1059,93 @@ export default function AddServicePage() {
 
   // Gallery images — 5 slots matching the HTML layout (base64 strings sent to API)
   const [galleryImages, setGalleryImages] = useState<(string | null)[]>([null, null, null, null, null]);
+
+  // ── Draft states (mirrors banner page) ───────────────────────────────────
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
+  // ── Draft helpers ────────────────────────────────────────────────────────
+  const getDraftPayload = useCallback(() => ({
+    serviceName, selectedMain, selectedCat, selectedSub, seoTags, content, galleryImages, packages
+  }), [serviceName, selectedMain, selectedCat, selectedSub, seoTags, content, galleryImages, packages]);
+
+  const saveDraftToStorage = useCallback((payload: ReturnType<typeof getDraftPayload>) => {
+    try {
+      localStorage.setItem(SERVICE_DRAFT_KEY, JSON.stringify({ payload, savedAt: new Date().toISOString() }));
+      const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setDraftTime(t);
+      setDraftStatus('saved');
+    } catch {
+      setDraftStatus('unsaved');
+    }
+  }, []);
+
+  const discardDraft = () => {
+    localStorage.removeItem(SERVICE_DRAFT_KEY);
+    setHasDraft(false);
+    setDraftStatus('idle');
+  };
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(SERVICE_DRAFT_KEY);
+      if (!raw) return;
+      const { payload } = JSON.parse(raw);
+      if (payload.serviceName !== undefined) setServiceName(payload.serviceName);
+      if (payload.selectedMain !== undefined) setSelectedMain(payload.selectedMain);
+      if (payload.selectedCat !== undefined) setSelectedCat(payload.selectedCat);
+      if (payload.selectedSub !== undefined) setSelectedSub(payload.selectedSub);
+      if (payload.seoTags !== undefined) setSeoTags(payload.seoTags);
+      if (payload.content !== undefined) {
+        setContent(payload.content);
+        // Also update the contenteditable editor visually
+        setTimeout(() => {
+          const editor = document.getElementById('desc-editor') as HTMLElement | null;
+          if (editor) editor.innerHTML = payload.content;
+        }, 0);
+      }
+      if (payload.galleryImages !== undefined) setGalleryImages(payload.galleryImages);
+      if (payload.packages !== undefined) setPackages(payload.packages);
+      setHasDraft(false);
+      setDraftStatus('saved');
+    } catch {
+      setHasDraft(false);
+    }
+  };
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    const raw = localStorage.getItem(SERVICE_DRAFT_KEY);
+    if (raw) {
+      try {
+        const { savedAt } = JSON.parse(raw);
+        const t = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setDraftTime(t);
+        setHasDraft(true);
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Auto-save: trigger 5s after each field change
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setDraftStatus('saving');
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const payload = getDraftPayload();
+    autoSaveTimerRef.current = setTimeout(() => saveDraftToStorage(payload), 5000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [getDraftPayload, saveDraftToStorage]);
+
+  useEffect(() => {
+    fetch('/api/categories').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setCategoriesData(data);
+    }).catch(console.error);
+  }, []);
+
+
 
   // ── Fill all fields with mock data for quick testing ──────────────────────
   const fillMockData = () => {
@@ -786,6 +1204,8 @@ export default function AddServicePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
       
+      // Clear localStorage draft on successful publish
+      if (status === 'active') localStorage.removeItem(SERVICE_DRAFT_KEY);
       alert(`Service ${status === 'draft' ? 'saved as draft' : 'published'} successfully!`);
       if (status === 'active') router.push('/dashboard/services');
     } catch (error: any) {
@@ -795,22 +1215,35 @@ export default function AddServicePage() {
     }
   };
 
+  const draftStatusLabel =
+    draftStatus === 'saving'  ? 'Auto-saving…' :
+    draftStatus === 'saved'   ? `Draft saved${draftTime ? ' at ' + draftTime : ''}` :
+    draftStatus === 'unsaved' ? 'Failed to save draft' :
+    'No changes';
+
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto font-sans pb-24">
-      {/* ── Mock Data Banner ── */}
-      <div className="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-yellow-800">🧪 Testing Mode</p>
-          <p className="text-xs text-yellow-600 mt-0.5">Pre-fill all fields with realistic sample data to test the form quickly.</p>
+      {/* ── Draft Restore Bar ── */}
+      {hasDraft && (
+        <div className="mb-4 flex items-center justify-between gap-4 bg-yellow-50 border border-yellow-300 rounded-xl px-5 py-3 shadow-sm flex-wrap">
+          <div className="flex items-center gap-2 text-yellow-800 text-sm font-medium flex-1">
+            <AlertTriangle size={16} className="text-yellow-500 shrink-0" />
+            Unsaved draft found from {draftTime}. Restore it to continue where you left off.
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={restoreDraft}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition">
+              Restore Draft
+            </button>
+            <button type="button" onClick={discardDraft}
+              className="bg-transparent border border-gray-300 text-gray-600 hover:border-red-300 hover:text-red-600 text-sm px-4 py-1.5 rounded-lg transition">
+              Discard
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={fillMockData}
-          className="shrink-0 bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 shadow-sm"
-        >
-          ✨ Fill Mock Data
-        </button>
-      </div>
+      )}
+
+
 
       {/* Basic Info */}
       <div className="mb-6">
@@ -1088,26 +1521,48 @@ export default function AddServicePage() {
         />
       </div>
 
-      {/* Footer Actions */}
-      <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-6">
-        <button className="border border-yellow-400 text-gray-800 font-semibold py-2.5 px-6 rounded-lg hover:bg-yellow-50 transition">
-          Cancel
-        </button>
-        <button 
-          onClick={() => handleSave('draft')}
-          disabled={isSubmitting}
-          className="border border-yellow-400 text-gray-800 font-semibold py-2.5 px-6 rounded-lg flex items-center gap-2 hover:bg-yellow-50 transition disabled:opacity-50"
-        >
-          <Save size={18} />
-          {isSubmitting ? 'Saving...' : 'Save Draft'}
-        </button>
-        <button 
-          onClick={() => handleSave('active')}
-          disabled={isSubmitting}
-          className="bg-[#ffc800] hover:bg-yellow-500 text-gray-900 font-bold py-2.5 px-6 rounded-lg shadow-sm transition disabled:opacity-50"
-        >
-          {isSubmitting ? 'Publishing...' : 'Publish Service'}
-        </button>
+      {/* Sticky Footer Actions */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between z-50 gap-3 shadow-lg">
+        {/* Draft status badge */}
+        <div className={`flex items-center gap-2 text-xs font-medium ${
+          draftStatus === 'saving'  ? 'text-amber-500' :
+          draftStatus === 'saved'   ? 'text-emerald-600' :
+          draftStatus === 'unsaved' ? 'text-red-500' : 'text-gray-400'
+        }`}>
+          <span className={`w-2 h-2 rounded-full inline-block ${
+            draftStatus === 'saving'  ? 'bg-amber-400 animate-pulse' :
+            draftStatus === 'saved'   ? 'bg-emerald-500' :
+            draftStatus === 'unsaved' ? 'bg-red-400' : 'bg-gray-300'
+          }`} />
+          {draftStatusLabel}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="border border-yellow-400 text-gray-800 font-semibold py-2.5 px-6 rounded-lg hover:bg-yellow-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSave('draft')}
+            disabled={isSubmitting}
+            className="border border-yellow-400 text-gray-800 font-semibold py-2.5 px-6 rounded-lg flex items-center gap-2 hover:bg-yellow-50 transition disabled:opacity-50"
+          >
+            <Save size={18} />
+            {isSubmitting ? 'Saving...' : 'Save Draft'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSave('active')}
+            disabled={isSubmitting}
+            className="bg-[#ffc800] hover:bg-yellow-500 text-gray-900 font-bold py-2.5 px-6 rounded-lg shadow-sm transition disabled:opacity-50"
+          >
+            {isSubmitting ? 'Publishing...' : 'Publish Service'}
+          </button>
+        </div>
       </div>
     </div>
   );
